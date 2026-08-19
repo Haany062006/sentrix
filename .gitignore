@@ -17,3 +17,6 @@ venv/
 
 data/events/*
 reports/daily/*
+
+recordings/
+registered_faces/
