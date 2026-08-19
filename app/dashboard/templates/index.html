@@ -1,0 +1,1028 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+
+    <meta charset="UTF-8">
+
+    <meta name="viewport"
+          content="width=device-width, initial-scale=1.0">
+
+    <title>SENTRIX Dashboard</title>
+
+    <style>
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            font-family: Arial, sans-serif;
+            background: #0b0f14;
+            color: white;
+        }
+
+        .header {
+            padding: 22px 35px;
+            background: #111820;
+            border-bottom: 1px solid #26313c;
+        }
+
+        .header h1 {
+            margin: 0;
+            font-size: 28px;
+            letter-spacing: 3px;
+        }
+
+        .header p {
+            margin: 6px 0 0;
+            color: #9ba7b3;
+        }
+
+        .container {
+            padding: 25px;
+            max-width: 1400px;
+            margin: auto;
+        }
+
+        .top-grid {
+            display: grid;
+            grid-template-columns: 2fr 1fr;
+            gap: 20px;
+        }
+
+        .card {
+            background: #111820;
+            border: 1px solid #26313c;
+            border-radius: 12px;
+            padding: 20px;
+        }
+
+        .card h2 {
+            margin-top: 0;
+            font-size: 18px;
+        }
+
+        /* ================================
+           LIVE CAMERA
+        ================================= */
+
+        .live-camera {
+            width: 100%;
+            background: black;
+            border-radius: 8px;
+            display: block;
+        }
+
+        /* ================================
+           STATUS
+        ================================= */
+
+        .status-grid {
+            display: grid;
+            gap: 12px;
+        }
+
+        .status-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 14px;
+            background: #18212b;
+            border-radius: 8px;
+        }
+
+        .status-name {
+            color: #aeb8c2;
+        }
+
+        .status-value {
+            font-weight: bold;
+        }
+
+        .ok {
+            color: #36d17c;
+        }
+
+        .danger {
+            color: #ff5757;
+        }
+
+        .warning {
+            color: #ffbf45;
+        }
+
+        /* ================================
+           RECORDINGS
+        ================================= */
+
+        .recordings {
+            margin-top: 20px;
+        }
+
+        .recording {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 14px;
+            margin-bottom: 10px;
+            background: #18212b;
+            border-radius: 8px;
+            gap: 15px;
+        }
+
+        .recording-name {
+            word-break: break-all;
+        }
+
+        .watch-button {
+            background: #273646;
+            color: white;
+            text-decoration: none;
+            padding: 8px 14px;
+            border-radius: 6px;
+            white-space: nowrap;
+        }
+
+        .watch-button:hover {
+            background: #34495e;
+        }
+
+        /* ================================
+           DAILY REPORT
+        ================================= */
+
+        .report-card {
+            margin-top: 20px;
+        }
+
+        .report-description {
+            color: #9ba7b3;
+            margin-bottom: 18px;
+        }
+
+        .report-controls {
+            display: flex;
+            gap: 12px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        .report-date {
+            background: #18212b;
+            color: white;
+            border: 1px solid #26313c;
+            padding: 10px;
+            border-radius: 6px;
+            font-size: 14px;
+        }
+
+        .report-date:focus {
+            outline: none;
+            border-color: #4b6075;
+        }
+
+        .report-button {
+            background: #273646;
+            color: white;
+            border: none;
+            padding: 10px 18px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+
+        .report-button:hover {
+            background: #34495e;
+        }
+
+        .report-button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        .report-message {
+            margin-top: 12px;
+            color: #9ba7b3;
+            min-height: 20px;
+        }
+
+        /* ================================
+           EVENTS
+        ================================= */
+
+        .events {
+            margin-top: 20px;
+        }
+
+        .event {
+            padding: 12px;
+            border-bottom: 1px solid #26313c;
+            color: #c5ced7;
+        }
+
+        .empty {
+            color: #77838f;
+            padding: 15px 0;
+        }
+
+        /* ================================
+           RESPONSIVE
+        ================================= */
+
+        @media (max-width: 900px) {
+
+            .top-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .container {
+                padding: 15px;
+            }
+
+            .header {
+                padding: 20px;
+            }
+
+        }
+
+    </style>
+
+</head>
+
+
+<body>
+
+
+    <!-- =================================
+         HEADER
+    ================================= -->
+
+    <div class="header">
+
+        <h1>SENTRIX</h1>
+
+        <p>
+            Smart Security & Monitoring System
+        </p>
+
+    </div>
+
+
+    <div class="container">
+
+
+        <!-- =================================
+             LIVE CAMERA + SYSTEM STATUS
+        ================================= -->
+
+        <div class="top-grid">
+
+
+            <!-- LIVE CAMERA -->
+
+            <div class="card">
+
+                <h2>📷 Live Camera</h2>
+
+                <img
+                    class="live-camera"
+                    src="/video_feed"
+                    alt="SENTRIX Live Camera"
+                >
+
+            </div>
+
+
+            <!-- SYSTEM STATUS -->
+
+            <div class="card">
+
+                <h2>System Status</h2>
+
+                <div class="status-grid">
+
+
+                    <!-- CAMERA -->
+
+                    <div class="status-item">
+
+                        <span class="status-name">
+                            Camera
+                        </span>
+
+                        <span
+                            id="cameraStatus"
+                            class="status-value">
+                            STARTING
+                        </span>
+
+                    </div>
+
+
+                    <!-- MOTION -->
+
+                    <div class="status-item">
+
+                        <span class="status-name">
+                            Motion
+                        </span>
+
+                        <span
+                            id="motionStatus"
+                            class="status-value">
+                            CLEAR
+                        </span>
+
+                    </div>
+
+
+                    <!-- FACE -->
+
+                    <div class="status-item">
+
+                        <span class="status-name">
+                            Face
+                        </span>
+
+                        <span
+                            id="faceStatus"
+                            class="status-value">
+                            NONE
+                        </span>
+
+                    </div>
+
+
+                    <!-- PERSON -->
+
+                    <div class="status-item">
+
+                        <span class="status-name">
+                            Person
+                        </span>
+
+                        <span
+                            id="personStatus"
+                            class="status-value">
+                            NONE
+                        </span>
+
+                    </div>
+
+
+                    <!-- TAMPER -->
+
+                    <div class="status-item">
+
+                        <span class="status-name">
+                            Tamper
+                        </span>
+
+                        <span
+                            id="tamperStatus"
+                            class="status-value">
+                            CAMERA OK
+                        </span>
+
+                    </div>
+
+
+                    <!-- RECORDING -->
+
+                    <div class="status-item">
+
+                        <span class="status-name">
+                            Recording
+                        </span>
+
+                        <span
+                            id="recordingStatus"
+                            class="status-value">
+                            NO
+                        </span>
+
+                    </div>
+
+                </div>
+
+            </div>
+
+        </div>
+
+
+        <!-- =================================
+             RECORDINGS
+        ================================= -->
+
+        <div class="card recordings">
+
+            <h2>🎥 Recordings</h2>
+
+            <div id="recordingsList">
+
+                <div class="empty">
+                    No recordings yet.
+                </div>
+
+            </div>
+
+        </div>
+
+
+        <!-- =================================
+             DAILY SECURITY REPORT
+        ================================= -->
+
+        <div class="card report-card">
+
+            <h2>📄 Daily Security Report</h2>
+
+            <p class="report-description">
+
+                Select a date and generate a security report
+                containing the day's security activity.
+
+            </p>
+
+
+            <div class="report-controls">
+
+
+                <!-- DATE -->
+
+                <input
+                    type="date"
+                    id="reportDate"
+                    class="report-date"
+                >
+
+
+                <!-- GENERATE BUTTON -->
+
+                <button
+                    id="generateReportButton"
+                    class="report-button"
+                    onclick="generateReport()"
+                >
+                    Generate Report
+                </button>
+
+            </div>
+
+
+            <!-- MESSAGE -->
+
+            <div
+                id="reportMessage"
+                class="report-message"
+            ></div>
+
+        </div>
+
+
+        <!-- =================================
+             RECENT EVENTS
+        ================================= -->
+
+        <div class="card events">
+
+            <h2>📋 Recent Events</h2>
+
+            <div id="eventsList">
+
+                <div class="empty">
+                    No events yet.
+                </div>
+
+            </div>
+
+        </div>
+
+
+    </div>
+
+
+    <!-- =================================
+         JAVASCRIPT
+    ================================= -->
+
+    <script>
+
+
+        /* =================================
+           UPDATE SYSTEM STATUS
+        ================================= */
+
+        async function updateStatus() {
+
+            try {
+
+                const response =
+                    await fetch("/api/status");
+
+                const data =
+                    await response.json();
+
+
+                /* CAMERA */
+
+                const camera =
+                    document.getElementById(
+                        "cameraStatus"
+                    );
+
+                camera.textContent =
+                    data.camera;
+
+                camera.className =
+                    "status-value " +
+                    (
+                        data.camera === "ACTIVE"
+                        ? "ok"
+                        : "warning"
+                    );
+
+
+                /* MOTION */
+
+                const motion =
+                    document.getElementById(
+                        "motionStatus"
+                    );
+
+                motion.textContent =
+                    data.motion
+                    ? "DETECTED"
+                    : "CLEAR";
+
+                motion.className =
+                    "status-value " +
+                    (
+                        data.motion
+                        ? "warning"
+                        : "ok"
+                    );
+
+
+                /* FACE */
+
+                const face =
+                    document.getElementById(
+                        "faceStatus"
+                    );
+
+                face.textContent =
+                    data.face_detected
+                    ? "DETECTED"
+                    : "NONE";
+
+
+                /* PERSON */
+
+                const person =
+                    document.getElementById(
+                        "personStatus"
+                    );
+
+                if (
+                    data.people &&
+                    data.people.length > 0
+                ) {
+
+                    person.textContent =
+                        data.people.join(", ");
+
+                }
+
+                else {
+
+                    person.textContent =
+                        "NONE";
+
+                }
+
+
+                /* TAMPER */
+
+                const tamper =
+                    document.getElementById(
+                        "tamperStatus"
+                    );
+
+                tamper.textContent =
+                    data.tamper;
+
+                tamper.className =
+                    "status-value " +
+                    (
+                        data.tampering
+                        ? "danger"
+                        : "ok"
+                    );
+
+
+                /* RECORDING */
+
+                const recording =
+                    document.getElementById(
+                        "recordingStatus"
+                    );
+
+                recording.textContent =
+                    data.recording
+                    ? "RECORDING"
+                    : "NO";
+
+                recording.className =
+                    "status-value " +
+                    (
+                        data.recording
+                        ? "danger"
+                        : "ok"
+                    );
+
+            }
+
+            catch (error) {
+
+                console.log(
+                    "Status error:",
+                    error
+                );
+
+            }
+
+        }
+
+
+        /* =================================
+           UPDATE EVENTS
+        ================================= */
+
+        async function updateEvents() {
+
+            try {
+
+                const response =
+                    await fetch("/api/events");
+
+                const events =
+                    await response.json();
+
+                const container =
+                    document.getElementById(
+                        "eventsList"
+                    );
+
+
+                if (events.length === 0) {
+
+                    container.innerHTML =
+                        '<div class="empty">' +
+                        'No events yet.' +
+                        '</div>';
+
+                    return;
+
+                }
+
+
+                container.innerHTML =
+                    events.map(
+                        event =>
+                            `<div class="event">
+                                ${event}
+                            </div>`
+                    ).join("");
+
+            }
+
+            catch (error) {
+
+                console.log(
+                    "Events error:",
+                    error
+                );
+
+            }
+
+        }
+
+
+        /* =================================
+           UPDATE RECORDINGS
+        ================================= */
+
+        async function updateRecordings() {
+
+            try {
+
+                const response =
+                    await fetch(
+                        "/api/recordings"
+                    );
+
+                const recordings =
+                    await response.json();
+
+                const container =
+                    document.getElementById(
+                        "recordingsList"
+                    );
+
+
+                if (recordings.length === 0) {
+
+                    container.innerHTML =
+                        '<div class="empty">' +
+                        'No recordings yet.' +
+                        '</div>';
+
+                    return;
+
+                }
+
+
+                container.innerHTML =
+                    recordings.map(
+                        recording =>
+
+                            `<div class="recording">
+
+                                <span class="recording-name">
+                                    ${recording.name}
+                                </span>
+
+                                <a
+                                    class="watch-button"
+                                    href="/recordings/${encodeURIComponent(recording.name)}"
+                                    target="_blank">
+                                    Open
+                                </a>
+
+                            </div>`
+
+                    ).join("");
+
+            }
+
+            catch (error) {
+
+                console.log(
+                    "Recording error:",
+                    error
+                );
+
+            }
+
+        }
+
+
+        /* =================================
+           GENERATE DAILY SECURITY REPORT
+        ================================= */
+
+        async function generateReport() {
+
+            const dateInput =
+                document.getElementById(
+                    "reportDate"
+                );
+
+            const message =
+                document.getElementById(
+                    "reportMessage"
+                );
+
+            const button =
+                document.getElementById(
+                    "generateReportButton"
+                );
+
+
+            const selectedDate =
+                dateInput.value;
+
+
+            /* CHECK DATE */
+
+            if (!selectedDate) {
+
+                message.textContent =
+                    "Please select a date.";
+
+                message.style.color =
+                    "#ffbf45";
+
+                return;
+
+            }
+
+
+            /* DISABLE BUTTON */
+
+            button.disabled = true;
+
+            button.textContent =
+                "Generating...";
+
+
+            message.textContent =
+                "Generating security report...";
+
+            message.style.color =
+                "#9ba7b3";
+
+
+            try {
+
+                const response =
+                    await fetch(
+                        "/api/generate-report",
+                        {
+                            method: "POST",
+
+                            headers: {
+                                "Content-Type":
+                                    "application/json"
+                            },
+
+                            body: JSON.stringify({
+                                date: selectedDate
+                            })
+                        }
+                    );
+
+
+                const result =
+                    await response.json();
+
+
+                console.log(
+                    "Report response:",
+                    result
+                );
+
+
+                /* ERROR */
+
+                if (
+                    !response.ok ||
+                    !result.success
+                ) {
+
+                    message.textContent =
+                        result.error ||
+                        "Could not generate report.";
+
+                    message.style.color =
+                        "#ff5757";
+
+                    return;
+
+                }
+
+
+                /* SUCCESS */
+
+                message.textContent =
+                    "✓ Report generated successfully. Opening PDF...";
+
+                message.style.color =
+                    "#36d17c";
+
+
+                /*
+                 * Build the PDF URL returned
+                 * by the Flask server.
+                 */
+
+                const reportUrl =
+                    "/reports/" +
+                    encodeURIComponent(
+                        result.filename
+                    );
+
+
+                /*
+                 * Open PDF in a new tab.
+                 */
+
+                window.open(
+                    reportUrl,
+                    "_blank"
+                );
+
+            }
+
+
+            catch (error) {
+
+                console.error(
+                    "Report generation error:",
+                    error
+                );
+
+                message.textContent =
+                    "Report generation failed.";
+
+                message.style.color =
+                    "#ff5757";
+
+            }
+
+
+            finally {
+
+                button.disabled = false;
+
+                button.textContent =
+                    "Generate Report";
+
+            }
+
+        }
+
+
+        /* =================================
+           SET TODAY'S DATE
+        ================================= */
+
+        window.addEventListener(
+            "DOMContentLoaded",
+            function () {
+
+                const dateInput =
+                    document.getElementById(
+                        "reportDate"
+                    );
+
+
+                const today =
+                    new Date();
+
+
+                const year =
+                    today.getFullYear();
+
+
+                const month =
+                    String(
+                        today.getMonth() + 1
+                    ).padStart(2, "0");
+
+
+                const day =
+                    String(
+                        today.getDate()
+                    ).padStart(2, "0");
+
+
+                dateInput.value =
+                    `${year}-${month}-${day}`;
+
+            }
+        );
+
+
+        /* =================================
+           AUTO REFRESH
+        ================================= */
+
+        setInterval(
+            updateStatus,
+            1000
+        );
+
+
+        setInterval(
+            updateEvents,
+            1000
+        );
+
+
+        setInterval(
+            updateRecordings,
+            3000
+        );
+
+
+        /* =================================
+           INITIAL LOAD
+        ================================= */
+
+        updateStatus();
+
+        updateEvents();
+
+        updateRecordings();
+
+
+    </script>
+
+
+</body>
+
+</html>

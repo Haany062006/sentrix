@@ -1,170 +1,68 @@
-import cv2
-
-from brightness import detect_darkness
-from blur import detect_blur
-from histogram import (
+from app.tamper.brightness import detect_darkness
+from app.tamper.blur import detect_blur
+from app.tamper.histogram import (
     calculate_histogram,
     detect_scene_change
 )
 
 
-def detect_tampering():
+class TamperDetector:
 
-    camera = cv2.VideoCapture(0)
+    def __init__(self, reference_frame):
 
-    if not camera.isOpened():
-
-        print(
-            "ERROR: Could not open camera."
+        self.reference_histogram = calculate_histogram(
+            reference_frame
         )
 
-        return
+    def detect(self, frame):
 
-    success, frame = camera.read()
+        # -----------------------------
+        # 1. LENS COVERED
+        # -----------------------------
 
-    if not success:
+        dark, brightness = detect_darkness(frame)
 
-        print(
-            "ERROR: Could not read frame."
-        )
+        # -----------------------------
+        # 2. CAMERA BLURRED
+        # -----------------------------
 
-        return
+        blurry, variance = detect_blur(frame)
 
-    reference_histogram = (
-        calculate_histogram(frame)
-    )
+        # -----------------------------
+        # 3. CAMERA MOVED
+        # -----------------------------
 
-    print(
-        "SentriX tamper detection started."
-    )
-
-    print(
-        "Press Q to quit."
-    )
-
-    while True:
-
-        success, frame = camera.read()
-
-        if not success:
-            break
-
-        dark, brightness = (
-            detect_darkness(frame)
-        )
-
-        blurry, variance = (
-            detect_blur(frame)
-        )
-
-        moved, correlation = (
-            detect_scene_change(
-                reference_histogram,
-                frame
-            )
-        )
-        tampering = False
-
-        if dark:
-            tampering = True
-
-        if blurry and variance < 10:
-            tampering = True
-
-        if moved and correlation > 0:
-            tampering = True
-
-        if tampering:
-
-            if dark:
-                text = "LENS COVERED"
-
-            elif blurry:
-                text = "CAMERA BLURRED"
-
-            elif moved:
-                text = "CAMERA MOVED"
-
-            else:
-                text = "CAMERA OK"
-
-            color = (
-                0,
-                0,
-                255
-            )
-
-        else:
-
-            text = "CAMERA OK"
-
-            color = (
-                0,
-                255,
-                0
-            )
-
-        cv2.putText(
-            frame,
-            text,
-            (20, 40),
-            cv2.FONT_HERSHEY_SIMPLEX,
-            1,
-            color,
-            2
-        )
-
-        cv2.putText(
-            frame,
-            f"Brightness: "
-            f"{brightness:.0f}",
-            (20, 80),
-            cv2.FONT_HERSHEY_SIMPLEX,
-            0.6,
-            (255, 255, 255),
-            2
-        )
-
-        cv2.putText(
-            frame,
-            f"Laplacian: "
-            f"{variance:.0f}",
-            (20, 110),
-            cv2.FONT_HERSHEY_SIMPLEX,
-            0.6,
-            (255, 255, 255),
-            2
-        )
-
-        cv2.putText(
-            frame,
-            f"Histogram: "
-            f"{correlation:.2f}",
-            (20, 140),
-            cv2.FONT_HERSHEY_SIMPLEX,
-            0.6,
-            (255, 255, 255),
-            2
-        )
-
-        cv2.imshow(
-            "SentriX Tamper Detection",
+        moved, correlation = detect_scene_change(
+            self.reference_histogram,
             frame
         )
 
-        if (
-            cv2.waitKey(1)
-            & 0xFF
-            == ord("q")
-        ):
+        # -----------------------------
+        # PRIORITY
+        # -----------------------------
 
-            break
+        if dark:
 
-    camera.release()
+            status = "LENS COVERED"
 
-    cv2.destroyAllWindows()
+        elif blurry:
 
+            status = "CAMERA BLURRED"
 
-if __name__ == "__main__":
+        elif moved:
 
-    detect_tampering()
+            status = "CAMERA MOVED"
+
+        else:
+
+            status = "CAMERA OK"
+
+        tampering = status != "CAMERA OK"
+
+        return {
+            "tampering": tampering,
+            "status": status,
+            "brightness": brightness,
+            "blur_variance": variance,
+            "histogram_correlation": correlation
+        }
