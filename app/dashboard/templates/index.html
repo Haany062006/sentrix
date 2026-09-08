@@ -64,20 +64,17 @@
             font-size: 18px;
         }
 
-        /* ================================
-           LIVE CAMERA
-        ================================= */
+        /* LIVE CAMERA */
 
         .live-camera {
             width: 100%;
             background: black;
             border-radius: 8px;
             display: block;
+            min-height: 300px;
         }
 
-        /* ================================
-           STATUS
-        ================================= */
+        /* STATUS */
 
         .status-grid {
             display: grid;
@@ -113,9 +110,7 @@
             color: #ffbf45;
         }
 
-        /* ================================
-           RECORDINGS
-        ================================= */
+        /* RECORDINGS */
 
         .recordings {
             margin-top: 20px;
@@ -143,15 +138,15 @@
             padding: 8px 14px;
             border-radius: 6px;
             white-space: nowrap;
+            border: none;
+            cursor: pointer;
         }
 
         .watch-button:hover {
             background: #34495e;
         }
 
-        /* ================================
-           DAILY REPORT
-        ================================= */
+        /* REPORT */
 
         .report-card {
             margin-top: 20px;
@@ -208,9 +203,7 @@
             min-height: 20px;
         }
 
-        /* ================================
-           EVENTS
-        ================================= */
+        /* EVENTS */
 
         .events {
             margin-top: 20px;
@@ -227,9 +220,7 @@
             padding: 15px 0;
         }
 
-        /* ================================
-           RESPONSIVE
-        ================================= */
+        /* RESPONSIVE */
 
         @media (max-width: 900px) {
 
@@ -255,9 +246,7 @@
 <body>
 
 
-    <!-- =================================
-         HEADER
-    ================================= -->
+    <!-- HEADER -->
 
     <div class="header">
 
@@ -273,9 +262,7 @@
     <div class="container">
 
 
-        <!-- =================================
-             LIVE CAMERA + SYSTEM STATUS
-        ================================= -->
+        <!-- CAMERA + STATUS -->
 
         <div class="top-grid">
 
@@ -412,9 +399,7 @@
         </div>
 
 
-        <!-- =================================
-             RECORDINGS
-        ================================= -->
+        <!-- RECORDINGS -->
 
         <div class="card recordings">
 
@@ -431,9 +416,7 @@
         </div>
 
 
-        <!-- =================================
-             DAILY SECURITY REPORT
-        ================================= -->
+        <!-- DAILY SECURITY REPORT -->
 
         <div class="card report-card">
 
@@ -449,17 +432,11 @@
 
             <div class="report-controls">
 
-
-                <!-- DATE -->
-
                 <input
                     type="date"
                     id="reportDate"
                     class="report-date"
                 >
-
-
-                <!-- GENERATE BUTTON -->
 
                 <button
                     id="generateReportButton"
@@ -472,8 +449,6 @@
             </div>
 
 
-            <!-- MESSAGE -->
-
             <div
                 id="reportMessage"
                 class="report-message"
@@ -482,9 +457,7 @@
         </div>
 
 
-        <!-- =================================
-             RECENT EVENTS
-        ================================= -->
+        <!-- RECENT EVENTS -->
 
         <div class="card events">
 
@@ -504,10 +477,6 @@
     </div>
 
 
-    <!-- =================================
-         JAVASCRIPT
-    ================================= -->
-
     <script>
 
 
@@ -522,6 +491,10 @@
                 const response =
                     await fetch("/api/status");
 
+                if (!response.ok) {
+                    throw new Error("Status request failed");
+                }
+
                 const data =
                     await response.json();
 
@@ -534,12 +507,14 @@
                     );
 
                 camera.textContent =
-                    data.camera;
+                    data.camera || "UNKNOWN";
 
                 camera.className =
                     "status-value " +
                     (
-                        data.camera === "ACTIVE"
+                        data.camera === "ACTIVE" ||
+                        data.camera === "RECORDING" ||
+                        data.camera === "MOTION DETECTED"
                         ? "ok"
                         : "warning"
                     );
@@ -578,6 +553,14 @@
                     ? "DETECTED"
                     : "NONE";
 
+                face.className =
+                    "status-value " +
+                    (
+                        data.face_detected
+                        ? "warning"
+                        : "ok"
+                    );
+
 
                 /* PERSON */
 
@@ -594,12 +577,18 @@
                     person.textContent =
                         data.people.join(", ");
 
+                    person.className =
+                        "status-value warning";
+
                 }
 
                 else {
 
                     person.textContent =
                         "NONE";
+
+                    person.className =
+                        "status-value ok";
 
                 }
 
@@ -612,7 +601,7 @@
                     );
 
                 tamper.textContent =
-                    data.tamper;
+                    data.tamper || "UNKNOWN";
 
                 tamper.className =
                     "status-value " +
@@ -668,6 +657,10 @@
                 const response =
                     await fetch("/api/events");
 
+                if (!response.ok) {
+                    throw new Error("Events request failed");
+                }
+
                 const events =
                     await response.json();
 
@@ -677,7 +670,10 @@
                     );
 
 
-                if (events.length === 0) {
+                if (
+                    !events ||
+                    events.length === 0
+                ) {
 
                     container.innerHTML =
                         '<div class="empty">' +
@@ -720,9 +716,11 @@
             try {
 
                 const response =
-                    await fetch(
-                        "/api/recordings"
-                    );
+                    await fetch("/api/recordings");
+
+                if (!response.ok) {
+                    throw new Error("Recording request failed");
+                }
 
                 const recordings =
                     await response.json();
@@ -733,7 +731,10 @@
                     );
 
 
-                if (recordings.length === 0) {
+                if (
+                    !recordings ||
+                    recordings.length === 0
+                ) {
 
                     container.innerHTML =
                         '<div class="empty">' +
@@ -747,23 +748,39 @@
 
                 container.innerHTML =
                     recordings.map(
-                        recording =>
+                        recording => {
 
-                            `<div class="recording">
+                            const filename =
+                                encodeURIComponent(
+                                    recording.name
+                                );
 
-                                <span class="recording-name">
-                                    ${recording.name}
-                                </span>
+                            const size =
+                                formatFileSize(
+                                    recording.size
+                                );
 
-                                <a
-                                    class="watch-button"
-                                    href="/recordings/${encodeURIComponent(recording.name)}"
-                                    target="_blank">
-                                    Open
-                                </a>
+                            return `
+                                <div class="recording">
 
-                            </div>`
+                                    <span class="recording-name">
+                                        🎥 ${recording.name}
+                                        <small style="color:#77838f;">
+                                            (${size})
+                                        </small>
+                                    </span>
 
+                                    <a
+                                        class="watch-button"
+                                        href="/recordings/${filename}"
+                                        download>
+                                        Download
+                                    </a>
+
+                                </div>
+                            `;
+
+                        }
                     ).join("");
 
             }
@@ -776,6 +793,42 @@
                 );
 
             }
+
+        }
+
+
+        /* =================================
+           FILE SIZE
+        ================================= */
+
+        function formatFileSize(bytes) {
+
+            if (!bytes || bytes <= 0) {
+                return "0 KB";
+            }
+
+            const units =
+                ["Bytes", "KB", "MB", "GB"];
+
+            let index = 0;
+
+            let size = bytes;
+
+            while (
+                size >= 1024 &&
+                index < units.length - 1
+            ) {
+
+                size /= 1024;
+                index++;
+
+            }
+
+            return (
+                size.toFixed(1) +
+                " " +
+                units[index]
+            );
 
         }
 
@@ -806,8 +859,6 @@
                 dateInput.value;
 
 
-            /* CHECK DATE */
-
             if (!selectedDate) {
 
                 message.textContent =
@@ -820,8 +871,6 @@
 
             }
 
-
-            /* DISABLE BUTTON */
 
             button.disabled = true;
 
@@ -866,8 +915,6 @@
                 );
 
 
-                /* ERROR */
-
                 if (
                     !response.ok ||
                     !result.success
@@ -885,19 +932,12 @@
                 }
 
 
-                /* SUCCESS */
-
                 message.textContent =
-                    "✓ Report generated successfully. Opening PDF...";
+                    "✓ Report generated successfully.";
 
                 message.style.color =
                     "#36d17c";
 
-
-                /*
-                 * Build the PDF URL returned
-                 * by the Flask server.
-                 */
 
                 const reportUrl =
                     "/reports/" +
@@ -907,7 +947,7 @@
 
 
                 /*
-                 * Open PDF in a new tab.
+                 * Open the generated PDF.
                  */
 
                 window.open(
@@ -959,26 +999,21 @@
                         "reportDate"
                     );
 
-
                 const today =
                     new Date();
 
-
                 const year =
                     today.getFullYear();
-
 
                 const month =
                     String(
                         today.getMonth() + 1
                     ).padStart(2, "0");
 
-
                 const day =
                     String(
                         today.getDate()
                     ).padStart(2, "0");
-
 
                 dateInput.value =
                     `${year}-${month}-${day}`;
@@ -996,12 +1031,10 @@
             1000
         );
 
-
         setInterval(
             updateEvents,
             1000
         );
-
 
         setInterval(
             updateRecordings,

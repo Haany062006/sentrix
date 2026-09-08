@@ -156,7 +156,7 @@ def main():
     # OPEN CAMERA
     # --------------------------------
 
-    camera = cv2.VideoCapture(0)
+    camera = cv2.VideoCapture(0, cv2.CAP_MSMF)
 
     if not camera.isOpened():
 
