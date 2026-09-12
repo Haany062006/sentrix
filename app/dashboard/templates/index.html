@@ -50,6 +50,49 @@
             display: grid;
             grid-template-columns: 2fr 1fr;
             gap: 20px;
+            align-items: start;
+        }
+
+        .left-column {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            min-width: 0;
+        }
+
+        .left-column .alert-panel,
+        .left-column .card {
+            margin-bottom: 0;
+        }
+
+        .camera-card {
+            overflow: hidden;
+        }
+
+        .live-camera-wrap {
+            position: relative;
+            width: 100%;
+            background: #000;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        .live-camera {
+            width: 100%;
+            height: auto;
+            aspect-ratio: 16 / 9;
+            min-height: 0;
+            object-fit: contain;
+            background: #000;
+        }
+
+        .camera-help {
+            display: none;
+            padding: 12px;
+            text-align: center;
+            color: #9ba7b3;
+            font-size: 14px;
+            background: #111820;
         }
 
         .card {
@@ -62,6 +105,82 @@
         .card h2 {
             margin-top: 0;
             font-size: 18px;
+        }
+
+
+        /* CRITICAL SECURITY ALERT POPUP */
+
+        .security-popup {
+            position: fixed;
+            top: 24px;
+            right: 24px;
+            width: min(420px, calc(100vw - 32px));
+            padding: 18px 20px;
+            border-radius: 14px;
+            background: #24171a;
+            border: 1px solid #ff5757;
+            border-left: 6px solid #ff5757;
+            box-shadow: 0 12px 40px rgba(0, 0, 0, 0.45);
+            z-index: 9999;
+            opacity: 0;
+            transform: translateY(-18px);
+            pointer-events: none;
+            transition: opacity 0.25s ease, transform 0.25s ease;
+        }
+
+        .security-popup.show {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        .security-popup.known-alert {
+            border-color: #36d17c;
+            border-left-color: #36d17c;
+            background: #14241b;
+        }
+
+        .security-popup.known-alert .security-popup-title {
+            color: #36d17c;
+        }
+
+        .security-popup-title {
+            font-size: 15px;
+            font-weight: 800;
+            letter-spacing: 1px;
+            margin-bottom: 7px;
+        }
+
+        .security-popup-message {
+            font-size: 19px;
+            font-weight: 800;
+            line-height: 1.35;
+            margin-bottom: 6px;
+        }
+
+        .security-popup-time {
+            color: #c1c8d0;
+            font-size: 13px;
+        }
+
+        .security-popup-close {
+            position: absolute;
+            top: 8px;
+            right: 10px;
+            border: 0;
+            background: transparent;
+            color: #d7dce2;
+            font-size: 22px;
+            cursor: pointer;
+            line-height: 1;
+        }
+
+        @media (max-width: 600px) {
+            .security-popup {
+                top: 12px;
+                left: 12px;
+                right: 12px;
+                width: auto;
+            }
         }
 
         /* LIVE CAMERA */
@@ -220,20 +339,118 @@
             padding: 15px 0;
         }
 
+
+        /* SECURITY ALERT */
+
+        .alert-panel {
+            margin-bottom: 16px;
+            border-radius: 12px;
+            padding: 16px 18px;
+            border: 1px solid #26313c;
+            background: #18212b;
+            transition: 0.2s ease;
+        }
+
+        .alert-panel.normal {
+            border-left: 5px solid #36d17c;
+        }
+
+        .alert-panel.warning {
+            border-left: 5px solid #ffbf45;
+        }
+
+        .alert-panel.danger {
+            border-left: 5px solid #ff5757;
+            background: #24171a;
+        }
+
+        .alert-title {
+            font-size: 15px;
+            font-weight: bold;
+            letter-spacing: 1px;
+            margin-bottom: 6px;
+        }
+
+        .alert-message {
+            font-size: 17px;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+
+        .alert-time {
+            color: #9ba7b3;
+            font-size: 13px;
+        }
+
+        .voice-monitor {
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+
+        .voice-status {
+            color: #9ba7b3;
+            font-size: 14px;
+        }
+
+        .voice-button {
+            border: 1px solid #344454;
+            border-radius: 8px;
+            padding: 10px 14px;
+            background: #18212b;
+            color: white;
+            cursor: pointer;
+            font-weight: bold;
+        }
+
+        .voice-button:hover {
+            background: #202c38;
+        }
+
         /* RESPONSIVE */
 
         @media (max-width: 900px) {
 
             .top-grid {
                 grid-template-columns: 1fr;
+                gap: 15px;
             }
 
             .container {
-                padding: 15px;
+                padding: 12px;
             }
 
             .header {
-                padding: 20px;
+                padding: 18px 15px;
+            }
+
+            .header h1 {
+                font-size: 26px;
+            }
+
+            .card {
+                padding: 16px;
+            }
+
+            .live-camera {
+                aspect-ratio: 4 / 3;
+            }
+
+            .voice-monitor {
+                align-items: flex-start;
+            }
+
+            .voice-monitor > div:last-child {
+                width: 100%;
+                display: flex;
+                gap: 8px;
+            }
+
+            .voice-button {
+                flex: 1;
             }
 
         }
@@ -243,7 +460,40 @@
 </head>
 
 
+
 <body>
+
+    <!-- CRITICAL SECURITY ALERT POPUP -->
+
+    <div
+        id="securityPopup"
+        class="security-popup"
+        role="alert"
+        aria-live="assertive"
+        aria-atomic="true"
+    >
+        <button
+            class="security-popup-close"
+            type="button"
+            onclick="hideSecurityPopup()"
+            aria-label="Close alert"
+        >
+            ×
+        </button>
+
+        <div id="securityPopupTitle" class="security-popup-title">
+            🔴 SECURITY ALERT
+        </div>
+
+        <div id="securityPopupMessage" class="security-popup-message">
+            Security alert
+        </div>
+
+        <div id="securityPopupTime" class="security-popup-time">
+            Just now
+        </div>
+    </div>
+
 
 
     <!-- HEADER -->
@@ -262,36 +512,79 @@
     <div class="container">
 
 
-        <!-- CAMERA + STATUS -->
+        <!-- MAIN MONITORING AREA -->
 
         <div class="top-grid">
 
+            <!-- LEFT: ALERT + CAMERA + VOICE -->
 
-            <!-- LIVE CAMERA -->
+            <div class="left-column">
 
-            <div class="card">
+<!-- LIVE CAMERA -->
 
-                <h2>📷 Live Camera</h2>
+                <div class="card camera-card">
 
-                <img
-                    class="live-camera"
-                    src="/video_feed"
-                    alt="SENTRIX Live Camera"
-                >
+                    <h2>📷 Live Camera</h2>
+
+                    <div class="live-camera-wrap">
+
+                        <img
+                            id="liveCamera"
+                            class="live-camera"
+                            src="/video_feed"
+                            alt="SENTRIX Live Camera"
+                        >
+
+                        <div id="cameraHelp" class="camera-help">
+                            Camera stream is not available. Check that SENTRIX is running and the camera is active.
+                        </div>
+
+                    </div>
+
+                </div>
+
+
+                <!-- VOICE MONITOR -->
+
+                <div class="card voice-monitor">
+
+                    <div>
+                        <strong>🔊 Voice Monitor</strong>
+
+                        <div id="voiceStatus" class="voice-status">
+                            Voice disabled — tap Enable Voice
+                        </div>
+                    </div>
+
+                    <div>
+                        <button
+                            id="voiceButton"
+                            class="voice-button"
+                            onclick="toggleVoice()"
+                        >
+                            Enable Voice
+                        </button>
+
+                        <button
+                            class="voice-button"
+                            onclick="testVoice()"
+                        >
+                            🔊 Test Voice
+                        </button>
+                    </div>
+
+                </div>
 
             </div>
 
 
-            <!-- SYSTEM STATUS -->
+            <!-- RIGHT: SYSTEM STATUS -->
 
             <div class="card">
 
                 <h2>System Status</h2>
 
                 <div class="status-grid">
-
-
-                    <!-- CAMERA -->
 
                     <div class="status-item">
 
@@ -308,8 +601,6 @@
                     </div>
 
 
-                    <!-- MOTION -->
-
                     <div class="status-item">
 
                         <span class="status-name">
@@ -324,8 +615,6 @@
 
                     </div>
 
-
-                    <!-- FACE -->
 
                     <div class="status-item">
 
@@ -342,8 +631,6 @@
                     </div>
 
 
-                    <!-- PERSON -->
-
                     <div class="status-item">
 
                         <span class="status-name">
@@ -359,8 +646,6 @@
                     </div>
 
 
-                    <!-- TAMPER -->
-
                     <div class="status-item">
 
                         <span class="status-name">
@@ -375,8 +660,6 @@
 
                     </div>
 
-
-                    <!-- RECORDING -->
 
                     <div class="status-item">
 
@@ -647,6 +930,344 @@
 
 
         /* =================================
+           CRITICAL ALERT + VOICE MONITOR
+        ================================= */
+
+        let voiceEnabled = false;
+        let lastCriticalEvent = "";
+        let eventsInitialized = false;
+        let popupTimer = null;
+
+        let voiceQueue = [];
+        let isSpeaking = false;
+        const ALERT_COOLDOWN = 6000;
+        const lastAlertTime = {};
+
+        function canAlert(eventType) {
+            const now = Date.now();
+
+            if (
+                lastAlertTime[eventType] &&
+                now - lastAlertTime[eventType] < ALERT_COOLDOWN
+            ) {
+                return false;
+            }
+
+            lastAlertTime[eventType] = now;
+            return true;
+        }
+
+    function speakAlert(text) {
+        if (!voiceEnabled || !text) return;
+
+        // Add the new alert to the queue
+        voiceQueue.push(text);
+
+        // Start speaking if nothing is currently being spoken
+        processVoiceQueue();
+    }
+
+    function processVoiceQueue() {
+        if (isSpeaking || voiceQueue.length === 0 || !voiceEnabled) {
+            return;
+        }
+
+        const text = voiceQueue.shift();
+
+        const utterance = new SpeechSynthesisUtterance(text);
+
+        utterance.rate = 0.9;
+        utterance.pitch = 1.0;
+        utterance.volume = 1.0;
+
+        isSpeaking = true;
+
+        utterance.onend = function () {
+            isSpeaking = false;
+
+            // Wait a tiny moment before the next alert
+            setTimeout(() => {
+                processVoiceQueue();
+            }, 200);
+        };
+
+        utterance.onerror = function () {
+            isSpeaking = false;
+            processVoiceQueue();
+        };
+
+        window.speechSynthesis.speak(utterance);
+}
+       function stopVoiceAlerts() {
+            voiceQueue = [];
+            isSpeaking = false;
+            window.speechSynthesis.cancel();
+        }
+        
+
+        function getCriticalAlert(eventText) {
+
+            const parts = String(eventText).split(" - ");
+            const message = parts.length > 1
+                ? parts.slice(1).join(" - ")
+                : String(eventText);
+            const lower = message.toLowerCase();
+
+            if (lower.includes("unknown person detected")) {
+                return {
+                    type: "unknown",
+                    title: "🔴 SECURITY ALERT",
+                    message: "Unknown person detected",
+                    voice: "Attention. Unknown person detected."
+                };
+            }
+
+            if (lower.includes("recognized")) {
+                const match = message.match(/(.+?) recognized/i);
+                const person = match ? match[1].trim() : "Known person";
+                return {
+                    type: "known",
+                    title: "🟢 SECURITY NOTIFICATION",
+                    message: person + " recognized",
+                    voice: "Known person recognized. " + person
+                };
+            }
+
+            if (lower.includes("lens covered")) {
+                return {
+                    type: "tamper",
+                    title: "🔴 SECURITY ALERT",
+                    message: "Lens covered",
+                    voice: "Warning. Camera lens covered."
+                };
+            }
+
+            if (lower.includes("camera blurred") ||
+                lower.includes("lens blurred")) {
+                return {
+                    type: "tamper",
+                    title: "🔴 SECURITY ALERT",
+                    message: "Camera lens blurred",
+                    voice: "Warning. Camera lens is blurred."
+                };
+            }
+
+            if (lower.includes("camera moved")) {
+                return {
+                    type: "tamper",
+                    title: "🔴 SECURITY ALERT",
+                    message: "Camera moved",
+                    voice: "Warning. Camera has been moved."
+                };
+            }
+
+            if (lower.includes("tamper")) {
+                return {
+                    type: "tamper",
+                    title: "🔴 SECURITY ALERT",
+                    message: "Camera tampering detected",
+                    voice: "Warning. Camera tampering detected."
+                };
+            }
+
+            return null;
+        }
+
+        function showSecurityPopup(alert, eventText) {
+
+            const popup =
+                document.getElementById("securityPopup");
+
+            const title =
+                document.getElementById("securityPopupTitle");
+
+            const message =
+                document.getElementById("securityPopupMessage");
+
+            const time =
+                document.getElementById("securityPopupTime");
+
+            title.textContent = alert.title;
+            message.textContent = alert.message;
+
+            const parts =
+                String(eventText).split(" - ");
+
+            time.textContent =
+                parts.length > 1
+                ? parts[0]
+                : "Just now";
+
+            popup.classList.remove("known-alert");
+
+            if (alert.type === "known") {
+                popup.classList.add("known-alert");
+            }
+
+            popup.classList.add("show");
+
+            if (popupTimer) {
+                clearTimeout(popupTimer);
+            }
+
+            popupTimer =
+                setTimeout(
+                    hideSecurityPopup,
+                    3000
+                );
+
+            speakAlert(alert.voice);
+
+        }
+
+
+        function hideSecurityPopup() {
+
+            const popup =
+                document.getElementById("securityPopup");
+
+            popup.classList.remove("show");
+            popup.classList.remove("known-alert");
+
+        }
+
+
+        function updateCriticalAlerts(events) {
+
+            if (!events || events.length === 0) {
+                return;
+            }
+
+            const latestEvent =
+                String(events[0]);
+
+            /*
+             * Establish the current event on first load.
+             * This prevents an old alert from popping up just
+             * because the dashboard was refreshed.
+             */
+
+            if (!eventsInitialized) {
+
+                lastCriticalEvent =
+                    latestEvent;
+
+                eventsInitialized =
+                    true;
+
+                return;
+
+            }
+
+            if (latestEvent === lastCriticalEvent) {
+                return;
+            }
+
+            lastCriticalEvent =
+                latestEvent;
+
+            const alert =
+                getCriticalAlert(latestEvent);
+            if (!canAlert(alert.type + ":" + alert.message)) {
+                return;
+            }
+            if (alert) {
+                showSecurityPopup(
+                    alert,
+                    latestEvent
+                );
+            }
+
+        }
+
+
+        function toggleVoice() {
+
+            if (!("speechSynthesis" in window)) {
+
+                alert(
+                    "Speech synthesis is not supported by this browser."
+                );
+
+                return;
+
+            }
+
+            voiceEnabled =
+                !voiceEnabled;
+
+            const button =
+                document.getElementById("voiceButton");
+
+            const status =
+                document.getElementById("voiceStatus");
+
+            if (voiceEnabled) {
+
+                button.textContent =
+                    "Disable Voice";
+
+                status.textContent =
+                    "Voice enabled — alerts will be spoken";
+
+                /* User interaction unlocks speech on many phones. */
+
+                const welcome =
+                    new SpeechSynthesisUtterance(
+                        "SENTRIX voice monitor enabled."
+                    );
+
+                welcome.rate = 0.9;
+                welcome.volume = 1.0;
+
+                window.speechSynthesis.cancel();
+                window.speechSynthesis.speak(welcome);
+
+            }
+
+            else {
+
+                button.textContent =
+                    "Enable Voice";
+
+                status.textContent =
+                    "Voice disabled — tap Enable Voice";
+
+                window.speechSynthesis.cancel();
+
+            }
+
+        }
+
+
+        function testVoice() {
+
+            if (!("speechSynthesis" in window)) {
+
+                alert(
+                    "Speech synthesis is NOT supported by this browser."
+                );
+
+                return;
+
+            }
+
+            const message =
+                new SpeechSynthesisUtterance(
+                    "Hello. This is the SENTRIX voice monitor."
+                );
+
+            message.rate = 0.9;
+            message.pitch = 1.0;
+            message.volume = 1.0;
+
+            window.speechSynthesis.cancel();
+            window.speechSynthesis.speak(message);
+
+        }
+
+
+        /* =================================
            UPDATE EVENTS
         ================================= */
 
@@ -663,6 +1284,8 @@
 
                 const events =
                     await response.json();
+
+                updateCriticalAlerts(events);
 
                 const container =
                     document.getElementById(
@@ -1020,6 +1643,41 @@
 
             }
         );
+
+
+        /* =================================
+           CAMERA STREAM CHECK
+        ================================= */
+
+        const liveCamera =
+            document.getElementById("liveCamera");
+
+        const cameraHelp =
+            document.getElementById("cameraHelp");
+
+        if (liveCamera) {
+
+            liveCamera.addEventListener(
+                "error",
+                function () {
+
+                    cameraHelp.style.display =
+                        "block";
+
+                }
+            );
+
+            liveCamera.addEventListener(
+                "load",
+                function () {
+
+                    cameraHelp.style.display =
+                        "none";
+
+                }
+            );
+
+        }
 
 
         /* =================================
