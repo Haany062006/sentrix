@@ -1,0 +1,1719 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+
+    <meta charset="UTF-8">
+
+    <meta name="viewport"
+          content="width=device-width, initial-scale=1.0">
+
+    <title>SENTRIX Dashboard</title>
+
+    <style>
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            font-family: Arial, sans-serif;
+            background: #0b0f14;
+            color: white;
+        }
+
+        .header {
+            padding: 22px 35px;
+            background: #111820;
+            border-bottom: 1px solid #26313c;
+        }
+
+        .header h1 {
+            margin: 0;
+            font-size: 28px;
+            letter-spacing: 3px;
+        }
+
+        .header p {
+            margin: 6px 0 0;
+            color: #9ba7b3;
+        }
+
+        .container {
+            padding: 25px;
+            max-width: 1400px;
+            margin: auto;
+        }
+
+        .top-grid {
+            display: grid;
+            grid-template-columns: 2fr 1fr;
+            gap: 20px;
+            align-items: start;
+        }
+
+        .left-column {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            min-width: 0;
+        }
+
+        .left-column .alert-panel,
+        .left-column .card {
+            margin-bottom: 0;
+        }
+
+        .camera-card {
+            overflow: hidden;
+        }
+
+        .live-camera-wrap {
+            position: relative;
+            width: 100%;
+            background: #000;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        .live-camera {
+            width: 100%;
+            height: auto;
+            aspect-ratio: 16 / 9;
+            min-height: 0;
+            object-fit: contain;
+            background: #000;
+        }
+
+        .camera-help {
+            display: none;
+            padding: 12px;
+            text-align: center;
+            color: #9ba7b3;
+            font-size: 14px;
+            background: #111820;
+        }
+
+        .card {
+            background: #111820;
+            border: 1px solid #26313c;
+            border-radius: 12px;
+            padding: 20px;
+        }
+
+        .card h2 {
+            margin-top: 0;
+            font-size: 18px;
+        }
+
+
+        /* CRITICAL SECURITY ALERT POPUP */
+
+        .security-popup {
+            position: fixed;
+            top: 24px;
+            right: 24px;
+            width: min(420px, calc(100vw - 32px));
+            padding: 18px 20px;
+            border-radius: 14px;
+            background: #24171a;
+            border: 1px solid #ff5757;
+            border-left: 6px solid #ff5757;
+            box-shadow: 0 12px 40px rgba(0, 0, 0, 0.45);
+            z-index: 9999;
+            opacity: 0;
+            transform: translateY(-18px);
+            pointer-events: none;
+            transition: opacity 0.25s ease, transform 0.25s ease;
+        }
+
+        .security-popup.show {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        .security-popup.known-alert {
+            border-color: #36d17c;
+            border-left-color: #36d17c;
+            background: #14241b;
+        }
+
+        .security-popup.known-alert .security-popup-title {
+            color: #36d17c;
+        }
+
+        .security-popup-title {
+            font-size: 15px;
+            font-weight: 800;
+            letter-spacing: 1px;
+            margin-bottom: 7px;
+        }
+
+        .security-popup-message {
+            font-size: 19px;
+            font-weight: 800;
+            line-height: 1.35;
+            margin-bottom: 6px;
+        }
+
+        .security-popup-time {
+            color: #c1c8d0;
+            font-size: 13px;
+        }
+
+        .security-popup-close {
+            position: absolute;
+            top: 8px;
+            right: 10px;
+            border: 0;
+            background: transparent;
+            color: #d7dce2;
+            font-size: 22px;
+            cursor: pointer;
+            line-height: 1;
+        }
+
+        @media (max-width: 600px) {
+            .security-popup {
+                top: 12px;
+                left: 12px;
+                right: 12px;
+                width: auto;
+            }
+        }
+
+        /* LIVE CAMERA */
+
+        .live-camera {
+            width: 100%;
+            background: black;
+            border-radius: 8px;
+            display: block;
+            min-height: 300px;
+        }
+
+        /* STATUS */
+
+        .status-grid {
+            display: grid;
+            gap: 12px;
+        }
+
+        .status-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 14px;
+            background: #18212b;
+            border-radius: 8px;
+        }
+
+        .status-name {
+            color: #aeb8c2;
+        }
+
+        .status-value {
+            font-weight: bold;
+        }
+
+        .ok {
+            color: #36d17c;
+        }
+
+        .danger {
+            color: #ff5757;
+        }
+
+        .warning {
+            color: #ffbf45;
+        }
+
+        /* RECORDINGS */
+
+        .recordings {
+            margin-top: 20px;
+        }
+
+        .recording {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 14px;
+            margin-bottom: 10px;
+            background: #18212b;
+            border-radius: 8px;
+            gap: 15px;
+        }
+
+        .recording-name {
+            word-break: break-all;
+        }
+
+        .watch-button {
+            background: #273646;
+            color: white;
+            text-decoration: none;
+            padding: 8px 14px;
+            border-radius: 6px;
+            white-space: nowrap;
+            border: none;
+            cursor: pointer;
+        }
+
+        .watch-button:hover {
+            background: #34495e;
+        }
+
+        /* REPORT */
+
+        .report-card {
+            margin-top: 20px;
+        }
+
+        .report-description {
+            color: #9ba7b3;
+            margin-bottom: 18px;
+        }
+
+        .report-controls {
+            display: flex;
+            gap: 12px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        .report-date {
+            background: #18212b;
+            color: white;
+            border: 1px solid #26313c;
+            padding: 10px;
+            border-radius: 6px;
+            font-size: 14px;
+        }
+
+        .report-date:focus {
+            outline: none;
+            border-color: #4b6075;
+        }
+
+        .report-button {
+            background: #273646;
+            color: white;
+            border: none;
+            padding: 10px 18px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+
+        .report-button:hover {
+            background: #34495e;
+        }
+
+        .report-button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        .report-message {
+            margin-top: 12px;
+            color: #9ba7b3;
+            min-height: 20px;
+        }
+
+        /* EVENTS */
+
+        .events {
+            margin-top: 20px;
+        }
+
+        .event {
+            padding: 12px;
+            border-bottom: 1px solid #26313c;
+            color: #c5ced7;
+        }
+
+        .empty {
+            color: #77838f;
+            padding: 15px 0;
+        }
+
+
+        /* SECURITY ALERT */
+
+        .alert-panel {
+            margin-bottom: 16px;
+            border-radius: 12px;
+            padding: 16px 18px;
+            border: 1px solid #26313c;
+            background: #18212b;
+            transition: 0.2s ease;
+        }
+
+        .alert-panel.normal {
+            border-left: 5px solid #36d17c;
+        }
+
+        .alert-panel.warning {
+            border-left: 5px solid #ffbf45;
+        }
+
+        .alert-panel.danger {
+            border-left: 5px solid #ff5757;
+            background: #24171a;
+        }
+
+        .alert-title {
+            font-size: 15px;
+            font-weight: bold;
+            letter-spacing: 1px;
+            margin-bottom: 6px;
+        }
+
+        .alert-message {
+            font-size: 17px;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+
+        .alert-time {
+            color: #9ba7b3;
+            font-size: 13px;
+        }
+
+        .voice-monitor {
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+
+        .voice-status {
+            color: #9ba7b3;
+            font-size: 14px;
+        }
+
+        .voice-button {
+            border: 1px solid #344454;
+            border-radius: 8px;
+            padding: 10px 14px;
+            background: #18212b;
+            color: white;
+            cursor: pointer;
+            font-weight: bold;
+        }
+
+        .voice-button:hover {
+            background: #202c38;
+        }
+
+        /* RESPONSIVE */
+
+        @media (max-width: 900px) {
+
+            .top-grid {
+                grid-template-columns: 1fr;
+                gap: 15px;
+            }
+
+            .container {
+                padding: 12px;
+            }
+
+            .header {
+                padding: 18px 15px;
+            }
+
+            .header h1 {
+                font-size: 26px;
+            }
+
+            .card {
+                padding: 16px;
+            }
+
+            .live-camera {
+                aspect-ratio: 4 / 3;
+            }
+
+            .voice-monitor {
+                align-items: flex-start;
+            }
+
+            .voice-monitor > div:last-child {
+                width: 100%;
+                display: flex;
+                gap: 8px;
+            }
+
+            .voice-button {
+                flex: 1;
+            }
+
+        }
+
+    </style>
+
+</head>
+
+
+
+<body>
+
+    <!-- CRITICAL SECURITY ALERT POPUP -->
+
+    <div
+        id="securityPopup"
+        class="security-popup"
+        role="alert"
+        aria-live="assertive"
+        aria-atomic="true"
+    >
+        <button
+            class="security-popup-close"
+            type="button"
+            onclick="hideSecurityPopup()"
+            aria-label="Close alert"
+        >
+            ×
+        </button>
+
+        <div id="securityPopupTitle" class="security-popup-title">
+            🔴 SECURITY ALERT
+        </div>
+
+        <div id="securityPopupMessage" class="security-popup-message">
+            Security alert
+        </div>
+
+        <div id="securityPopupTime" class="security-popup-time">
+            Just now
+        </div>
+    </div>
+
+
+
+    <!-- HEADER -->
+
+    <div class="header">
+
+        <h1>SENTRIX</h1>
+
+        <p>
+            Smart Security & Monitoring System
+        </p>
+
+    </div>
+
+
+    <div class="container">
+
+
+        <!-- MAIN MONITORING AREA -->
+
+        <div class="top-grid">
+
+            <!-- LEFT: ALERT + CAMERA + VOICE -->
+
+            <div class="left-column">
+
+<!-- LIVE CAMERA -->
+
+                <div class="card camera-card">
+
+                    <h2>📷 Live Camera</h2>
+
+                    <div class="live-camera-wrap">
+
+                        <img
+                            id="liveCamera"
+                            class="live-camera"
+                            src="/video_feed"
+                            alt="SENTRIX Live Camera"
+                        >
+
+                        <div id="cameraHelp" class="camera-help">
+                            Camera stream is not available. Check that SENTRIX is running and the camera is active.
+                        </div>
+
+                    </div>
+
+                </div>
+
+
+                <!-- VOICE MONITOR -->
+
+                <div class="card voice-monitor">
+
+                    <div>
+                        <strong>🔊 Voice Monitor</strong>
+
+                        <div id="voiceStatus" class="voice-status">
+                            Voice disabled — tap Enable Voice
+                        </div>
+                    </div>
+
+                    <div>
+                        <button
+                            id="voiceButton"
+                            class="voice-button"
+                            onclick="toggleVoice()"
+                        >
+                            Enable Voice
+                        </button>
+
+                        <button
+                            class="voice-button"
+                            onclick="testVoice()"
+                        >
+                            🔊 Test Voice
+                        </button>
+                    </div>
+
+                </div>
+
+            </div>
+
+
+            <!-- RIGHT: SYSTEM STATUS -->
+
+            <div class="card">
+
+                <h2>System Status</h2>
+
+                <div class="status-grid">
+
+                    <div class="status-item">
+
+                        <span class="status-name">
+                            Camera
+                        </span>
+
+                        <span
+                            id="cameraStatus"
+                            class="status-value">
+                            STARTING
+                        </span>
+
+                    </div>
+
+
+                    <div class="status-item">
+
+                        <span class="status-name">
+                            Motion
+                        </span>
+
+                        <span
+                            id="motionStatus"
+                            class="status-value">
+                            CLEAR
+                        </span>
+
+                    </div>
+
+
+                    <div class="status-item">
+
+                        <span class="status-name">
+                            Face
+                        </span>
+
+                        <span
+                            id="faceStatus"
+                            class="status-value">
+                            NONE
+                        </span>
+
+                    </div>
+
+
+                    <div class="status-item">
+
+                        <span class="status-name">
+                            Person
+                        </span>
+
+                        <span
+                            id="personStatus"
+                            class="status-value">
+                            NONE
+                        </span>
+
+                    </div>
+
+
+                    <div class="status-item">
+
+                        <span class="status-name">
+                            Tamper
+                        </span>
+
+                        <span
+                            id="tamperStatus"
+                            class="status-value">
+                            CAMERA OK
+                        </span>
+
+                    </div>
+
+
+                    <div class="status-item">
+
+                        <span class="status-name">
+                            Recording
+                        </span>
+
+                        <span
+                            id="recordingStatus"
+                            class="status-value">
+                            NO
+                        </span>
+
+                    </div>
+
+                </div>
+
+            </div>
+
+        </div>
+
+
+        <!-- RECORDINGS -->
+
+        <div class="card recordings">
+
+            <h2>🎥 Recordings</h2>
+
+            <div id="recordingsList">
+
+                <div class="empty">
+                    No recordings yet.
+                </div>
+
+            </div>
+
+        </div>
+
+
+        <!-- DAILY SECURITY REPORT -->
+
+        <div class="card report-card">
+
+            <h2>📄 Daily Security Report</h2>
+
+            <p class="report-description">
+
+                Select a date and generate a security report
+                containing the day's security activity.
+
+            </p>
+
+
+            <div class="report-controls">
+
+                <input
+                    type="date"
+                    id="reportDate"
+                    class="report-date"
+                >
+
+                <button
+                    id="generateReportButton"
+                    class="report-button"
+                    onclick="generateReport()"
+                >
+                    Generate Report
+                </button>
+
+            </div>
+
+
+            <div
+                id="reportMessage"
+                class="report-message"
+            ></div>
+
+        </div>
+
+
+        <!-- RECENT EVENTS -->
+
+        <div class="card events">
+
+            <h2>📋 Recent Events</h2>
+
+            <div id="eventsList">
+
+                <div class="empty">
+                    No events yet.
+                </div>
+
+            </div>
+
+        </div>
+
+
+    </div>
+
+
+    <script>
+
+
+        /* =================================
+           UPDATE SYSTEM STATUS
+        ================================= */
+
+        async function updateStatus() {
+
+            try {
+
+                const response =
+                    await fetch("/api/status");
+
+                if (!response.ok) {
+                    throw new Error("Status request failed");
+                }
+
+                const data =
+                    await response.json();
+
+
+                /* CAMERA */
+
+                const camera =
+                    document.getElementById(
+                        "cameraStatus"
+                    );
+
+                camera.textContent =
+                    data.camera || "UNKNOWN";
+
+                camera.className =
+                    "status-value " +
+                    (
+                        data.camera === "ACTIVE" ||
+                        data.camera === "RECORDING" ||
+                        data.camera === "MOTION DETECTED"
+                        ? "ok"
+                        : "warning"
+                    );
+
+
+                /* MOTION */
+
+                const motion =
+                    document.getElementById(
+                        "motionStatus"
+                    );
+
+                motion.textContent =
+                    data.motion
+                    ? "DETECTED"
+                    : "CLEAR";
+
+                motion.className =
+                    "status-value " +
+                    (
+                        data.motion
+                        ? "warning"
+                        : "ok"
+                    );
+
+
+                /* FACE */
+
+                const face =
+                    document.getElementById(
+                        "faceStatus"
+                    );
+
+                face.textContent =
+                    data.face_detected
+                    ? "DETECTED"
+                    : "NONE";
+
+                face.className =
+                    "status-value " +
+                    (
+                        data.face_detected
+                        ? "warning"
+                        : "ok"
+                    );
+
+
+                /* PERSON */
+
+                const person =
+                    document.getElementById(
+                        "personStatus"
+                    );
+
+                if (
+                    data.people &&
+                    data.people.length > 0
+                ) {
+
+                    person.textContent =
+                        data.people.join(", ");
+
+                    person.className =
+                        "status-value warning";
+
+                }
+
+                else {
+
+                    person.textContent =
+                        "NONE";
+
+                    person.className =
+                        "status-value ok";
+
+                }
+
+
+                /* TAMPER */
+
+                const tamper =
+                    document.getElementById(
+                        "tamperStatus"
+                    );
+
+                tamper.textContent =
+                    data.tamper || "UNKNOWN";
+
+                tamper.className =
+                    "status-value " +
+                    (
+                        data.tampering
+                        ? "danger"
+                        : "ok"
+                    );
+
+
+                /* RECORDING */
+
+                const recording =
+                    document.getElementById(
+                        "recordingStatus"
+                    );
+
+                recording.textContent =
+                    data.recording
+                    ? "RECORDING"
+                    : "NO";
+
+                recording.className =
+                    "status-value " +
+                    (
+                        data.recording
+                        ? "danger"
+                        : "ok"
+                    );
+
+            }
+
+            catch (error) {
+
+                console.log(
+                    "Status error:",
+                    error
+                );
+
+            }
+
+        }
+
+
+        /* =================================
+           CRITICAL ALERT + VOICE MONITOR
+        ================================= */
+
+        let voiceEnabled = false;
+        let lastCriticalEvent = "";
+        let eventsInitialized = false;
+        let popupTimer = null;
+
+        let voiceQueue = [];
+        let isSpeaking = false;
+        const ALERT_COOLDOWN = 6000;
+        const lastAlertTime = {};
+
+        function canAlert(eventType) {
+            const now = Date.now();
+
+            if (
+                lastAlertTime[eventType] &&
+                now - lastAlertTime[eventType] < ALERT_COOLDOWN
+            ) {
+                return false;
+            }
+
+            lastAlertTime[eventType] = now;
+            return true;
+        }
+
+    function speakAlert(text) {
+        if (!voiceEnabled || !text) return;
+
+        // Add the new alert to the queue
+        voiceQueue.push(text);
+
+        // Start speaking if nothing is currently being spoken
+        processVoiceQueue();
+    }
+
+    function processVoiceQueue() {
+        if (isSpeaking || voiceQueue.length === 0 || !voiceEnabled) {
+            return;
+        }
+
+        const text = voiceQueue.shift();
+
+        const utterance = new SpeechSynthesisUtterance(text);
+
+        utterance.rate = 0.9;
+        utterance.pitch = 1.0;
+        utterance.volume = 1.0;
+
+        isSpeaking = true;
+
+        utterance.onend = function () {
+            isSpeaking = false;
+
+            // Wait a tiny moment before the next alert
+            setTimeout(() => {
+                processVoiceQueue();
+            }, 200);
+        };
+
+        utterance.onerror = function () {
+            isSpeaking = false;
+            processVoiceQueue();
+        };
+
+        window.speechSynthesis.speak(utterance);
+}
+       function stopVoiceAlerts() {
+            voiceQueue = [];
+            isSpeaking = false;
+            window.speechSynthesis.cancel();
+        }
+        
+
+        function getCriticalAlert(eventText) {
+
+            const parts = String(eventText).split(" - ");
+            const message = parts.length > 1
+                ? parts.slice(1).join(" - ")
+                : String(eventText);
+            const lower = message.toLowerCase();
+
+            if (lower.includes("unknown person detected")) {
+                return {
+                    type: "unknown",
+                    title: "🔴 SECURITY ALERT",
+                    message: "Unknown person detected",
+                    voice: "Attention. Unknown person detected."
+                };
+            }
+
+            if (lower.includes("recognized")) {
+                const match = message.match(/(.+?) recognized/i);
+                const person = match ? match[1].trim() : "Known person";
+                return {
+                    type: "known",
+                    title: "🟢 SECURITY NOTIFICATION",
+                    message: person + " recognized",
+                    voice: "Known person recognized. " + person
+                };
+            }
+
+            if (lower.includes("lens covered")) {
+                return {
+                    type: "tamper",
+                    title: "🔴 SECURITY ALERT",
+                    message: "Lens covered",
+                    voice: "Warning. Camera lens covered."
+                };
+            }
+
+            if (lower.includes("camera blurred") ||
+                lower.includes("lens blurred")) {
+                return {
+                    type: "tamper",
+                    title: "🔴 SECURITY ALERT",
+                    message: "Camera lens blurred",
+                    voice: "Warning. Camera lens is blurred."
+                };
+            }
+
+            if (lower.includes("camera moved")) {
+                return {
+                    type: "tamper",
+                    title: "🔴 SECURITY ALERT",
+                    message: "Camera moved",
+                    voice: "Warning. Camera has been moved."
+                };
+            }
+
+            if (lower.includes("tamper")) {
+                return {
+                    type: "tamper",
+                    title: "🔴 SECURITY ALERT",
+                    message: "Camera tampering detected",
+                    voice: "Warning. Camera tampering detected."
+                };
+            }
+
+            return null;
+        }
+
+        function showSecurityPopup(alert, eventText) {
+
+            const popup =
+                document.getElementById("securityPopup");
+
+            const title =
+                document.getElementById("securityPopupTitle");
+
+            const message =
+                document.getElementById("securityPopupMessage");
+
+            const time =
+                document.getElementById("securityPopupTime");
+
+            title.textContent = alert.title;
+            message.textContent = alert.message;
+
+            const parts =
+                String(eventText).split(" - ");
+
+            time.textContent =
+                parts.length > 1
+                ? parts[0]
+                : "Just now";
+
+            popup.classList.remove("known-alert");
+
+            if (alert.type === "known") {
+                popup.classList.add("known-alert");
+            }
+
+            popup.classList.add("show");
+
+            if (popupTimer) {
+                clearTimeout(popupTimer);
+            }
+
+            popupTimer =
+                setTimeout(
+                    hideSecurityPopup,
+                    3000
+                );
+
+            speakAlert(alert.voice);
+
+        }
+
+
+        function hideSecurityPopup() {
+
+            const popup =
+                document.getElementById("securityPopup");
+
+            popup.classList.remove("show");
+            popup.classList.remove("known-alert");
+
+        }
+
+
+        function updateCriticalAlerts(events) {
+
+            if (!events || events.length === 0) {
+                return;
+            }
+
+            const latestEvent =
+                String(events[0]);
+
+            /*
+             * Establish the current event on first load.
+             * This prevents an old alert from popping up just
+             * because the dashboard was refreshed.
+             */
+
+            if (!eventsInitialized) {
+
+                lastCriticalEvent =
+                    latestEvent;
+
+                eventsInitialized =
+                    true;
+
+                return;
+
+            }
+
+            if (latestEvent === lastCriticalEvent) {
+                return;
+            }
+
+            lastCriticalEvent =
+                latestEvent;
+
+            const alert =
+                getCriticalAlert(latestEvent);
+            if (!canAlert(alert.type + ":" + alert.message)) {
+                return;
+            }
+            if (alert) {
+                showSecurityPopup(
+                    alert,
+                    latestEvent
+                );
+            }
+
+        }
+
+
+        function toggleVoice() {
+
+            if (!("speechSynthesis" in window)) {
+
+                alert(
+                    "Speech synthesis is not supported by this browser."
+                );
+
+                return;
+
+            }
+
+            voiceEnabled =
+                !voiceEnabled;
+
+            const button =
+                document.getElementById("voiceButton");
+
+            const status =
+                document.getElementById("voiceStatus");
+
+            if (voiceEnabled) {
+
+                button.textContent =
+                    "Disable Voice";
+
+                status.textContent =
+                    "Voice enabled — alerts will be spoken";
+
+                /* User interaction unlocks speech on many phones. */
+
+                const welcome =
+                    new SpeechSynthesisUtterance(
+                        "SENTRIX voice monitor enabled."
+                    );
+
+                welcome.rate = 0.9;
+                welcome.volume = 1.0;
+
+                window.speechSynthesis.cancel();
+                window.speechSynthesis.speak(welcome);
+
+            }
+
+            else {
+
+                button.textContent =
+                    "Enable Voice";
+
+                status.textContent =
+                    "Voice disabled — tap Enable Voice";
+
+                window.speechSynthesis.cancel();
+
+            }
+
+        }
+
+
+        function testVoice() {
+
+            if (!("speechSynthesis" in window)) {
+
+                alert(
+                    "Speech synthesis is NOT supported by this browser."
+                );
+
+                return;
+
+            }
+
+            const message =
+                new SpeechSynthesisUtterance(
+                    "Hello. This is the SENTRIX voice monitor."
+                );
+
+            message.rate = 0.9;
+            message.pitch = 1.0;
+            message.volume = 1.0;
+
+            window.speechSynthesis.cancel();
+            window.speechSynthesis.speak(message);
+
+        }
+
+
+        /* =================================
+           UPDATE EVENTS
+        ================================= */
+
+        async function updateEvents() {
+
+            try {
+
+                const response =
+                    await fetch("/api/events");
+
+                if (!response.ok) {
+                    throw new Error("Events request failed");
+                }
+
+                const events =
+                    await response.json();
+
+                updateCriticalAlerts(events);
+
+                const container =
+                    document.getElementById(
+                        "eventsList"
+                    );
+
+
+                if (
+                    !events ||
+                    events.length === 0
+                ) {
+
+                    container.innerHTML =
+                        '<div class="empty">' +
+                        'No events yet.' +
+                        '</div>';
+
+                    return;
+
+                }
+
+
+                container.innerHTML =
+                    events.map(
+                        event =>
+                            `<div class="event">
+                                ${event}
+                            </div>`
+                    ).join("");
+
+            }
+
+            catch (error) {
+
+                console.log(
+                    "Events error:",
+                    error
+                );
+
+            }
+
+        }
+
+
+        /* =================================
+           UPDATE RECORDINGS
+        ================================= */
+
+        async function updateRecordings() {
+
+            try {
+
+                const response =
+                    await fetch("/api/recordings");
+
+                if (!response.ok) {
+                    throw new Error("Recording request failed");
+                }
+
+                const recordings =
+                    await response.json();
+
+                const container =
+                    document.getElementById(
+                        "recordingsList"
+                    );
+
+
+                if (
+                    !recordings ||
+                    recordings.length === 0
+                ) {
+
+                    container.innerHTML =
+                        '<div class="empty">' +
+                        'No recordings yet.' +
+                        '</div>';
+
+                    return;
+
+                }
+
+
+                container.innerHTML =
+                    recordings.map(
+                        recording => {
+
+                            const filename =
+                                encodeURIComponent(
+                                    recording.name
+                                );
+
+                            const size =
+                                formatFileSize(
+                                    recording.size
+                                );
+
+                            return `
+                                <div class="recording">
+
+                                    <span class="recording-name">
+                                        🎥 ${recording.name}
+                                        <small style="color:#77838f;">
+                                            (${size})
+                                        </small>
+                                    </span>
+
+                                    <a
+                                        class="watch-button"
+                                        href="/recordings/${filename}"
+                                        download>
+                                        Download
+                                    </a>
+
+                                </div>
+                            `;
+
+                        }
+                    ).join("");
+
+            }
+
+            catch (error) {
+
+                console.log(
+                    "Recording error:",
+                    error
+                );
+
+            }
+
+        }
+
+
+        /* =================================
+           FILE SIZE
+        ================================= */
+
+        function formatFileSize(bytes) {
+
+            if (!bytes || bytes <= 0) {
+                return "0 KB";
+            }
+
+            const units =
+                ["Bytes", "KB", "MB", "GB"];
+
+            let index = 0;
+
+            let size = bytes;
+
+            while (
+                size >= 1024 &&
+                index < units.length - 1
+            ) {
+
+                size /= 1024;
+                index++;
+
+            }
+
+            return (
+                size.toFixed(1) +
+                " " +
+                units[index]
+            );
+
+        }
+
+
+        /* =================================
+           GENERATE DAILY SECURITY REPORT
+        ================================= */
+
+        async function generateReport() {
+
+            const dateInput =
+                document.getElementById(
+                    "reportDate"
+                );
+
+            const message =
+                document.getElementById(
+                    "reportMessage"
+                );
+
+            const button =
+                document.getElementById(
+                    "generateReportButton"
+                );
+
+
+            const selectedDate =
+                dateInput.value;
+
+
+            if (!selectedDate) {
+
+                message.textContent =
+                    "Please select a date.";
+
+                message.style.color =
+                    "#ffbf45";
+
+                return;
+
+            }
+
+
+            button.disabled = true;
+
+            button.textContent =
+                "Generating...";
+
+
+            message.textContent =
+                "Generating security report...";
+
+            message.style.color =
+                "#9ba7b3";
+
+
+            try {
+
+                const response =
+                    await fetch(
+                        "/api/generate-report",
+                        {
+                            method: "POST",
+
+                            headers: {
+                                "Content-Type":
+                                    "application/json"
+                            },
+
+                            body: JSON.stringify({
+                                date: selectedDate
+                            })
+                        }
+                    );
+
+
+                const result =
+                    await response.json();
+
+
+                console.log(
+                    "Report response:",
+                    result
+                );
+
+
+                if (
+                    !response.ok ||
+                    !result.success
+                ) {
+
+                    message.textContent =
+                        result.error ||
+                        "Could not generate report.";
+
+                    message.style.color =
+                        "#ff5757";
+
+                    return;
+
+                }
+
+
+                message.textContent =
+                    "✓ Report generated successfully.";
+
+                message.style.color =
+                    "#36d17c";
+
+
+                const reportUrl =
+                    "/reports/" +
+                    encodeURIComponent(
+                        result.filename
+                    );
+
+
+                /*
+                 * Open the generated PDF.
+                 */
+
+                window.open(
+                    reportUrl,
+                    "_blank"
+                );
+
+            }
+
+
+            catch (error) {
+
+                console.error(
+                    "Report generation error:",
+                    error
+                );
+
+                message.textContent =
+                    "Report generation failed.";
+
+                message.style.color =
+                    "#ff5757";
+
+            }
+
+
+            finally {
+
+                button.disabled = false;
+
+                button.textContent =
+                    "Generate Report";
+
+            }
+
+        }
+
+
+        /* =================================
+           SET TODAY'S DATE
+        ================================= */
+
+        window.addEventListener(
+            "DOMContentLoaded",
+            function () {
+
+                const dateInput =
+                    document.getElementById(
+                        "reportDate"
+                    );
+
+                const today =
+                    new Date();
+
+                const year =
+                    today.getFullYear();
+
+                const month =
+                    String(
+                        today.getMonth() + 1
+                    ).padStart(2, "0");
+
+                const day =
+                    String(
+                        today.getDate()
+                    ).padStart(2, "0");
+
+                dateInput.value =
+                    `${year}-${month}-${day}`;
+
+            }
+        );
+
+
+        /* =================================
+           CAMERA STREAM CHECK
+        ================================= */
+
+        const liveCamera =
+            document.getElementById("liveCamera");
+
+        const cameraHelp =
+            document.getElementById("cameraHelp");
+
+        if (liveCamera) {
+
+            liveCamera.addEventListener(
+                "error",
+                function () {
+
+                    cameraHelp.style.display =
+                        "block";
+
+                }
+            );
+
+            liveCamera.addEventListener(
+                "load",
+                function () {
+
+                    cameraHelp.style.display =
+                        "none";
+
+                }
+            );
+
+        }
+
+
+        /* =================================
+           AUTO REFRESH
+        ================================= */
+
+        setInterval(
+            updateStatus,
+            1000
+        );
+
+        setInterval(
+            updateEvents,
+            1000
+        );
+
+        setInterval(
+            updateRecordings,
+            3000
+        );
+
+
+        /* =================================
+           INITIAL LOAD
+        ================================= */
+
+        updateStatus();
+
+        updateEvents();
+
+        updateRecordings();
+
+
+    </script>
+
+
+</body>
+
+</html>

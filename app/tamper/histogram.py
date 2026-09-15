@@ -1,7 +1,8 @@
 import cv2
 
 
-HISTOGRAM_THRESHOLD = 0.30
+# Lower correlation = bigger scene change
+HISTOGRAM_THRESHOLD = 0.15
 
 
 def calculate_histogram(frame):
@@ -42,12 +43,6 @@ def detect_scene_change(
         cv2.HISTCMP_CORREL
     )
 
-    tampered = (
-        correlation <
-        HISTOGRAM_THRESHOLD
-    )
+    moved = correlation < HISTOGRAM_THRESHOLD
 
-    return (
-        tampered,
-        correlation
-    )
+    return moved, correlation

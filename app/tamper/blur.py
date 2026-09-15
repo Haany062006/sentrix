@@ -1,7 +1,8 @@
 import cv2
 
 
-BLUR_THRESHOLD = 20
+# Lower value = more blur
+BLUR_THRESHOLD = 50
 
 
 def detect_blur(frame):
@@ -16,8 +17,6 @@ def detect_blur(frame):
         cv2.CV_64F
     ).var()
 
-    tampered = (
-        variance < BLUR_THRESHOLD
-    )
+    blurred = variance < BLUR_THRESHOLD
 
-    return tampered, variance
+    return blurred, variance
