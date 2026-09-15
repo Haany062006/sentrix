@@ -20,3 +20,5 @@ reports/daily/*
 
 recordings/
 registered_faces/
+face_dataset/
+reports/*.pdf

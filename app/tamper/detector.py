@@ -1,16 +1,13 @@
 from app.tamper.brightness import detect_darkness
 from app.tamper.blur import detect_blur
-from app.tamper.histogram import (
-    calculate_histogram,
-    detect_scene_change
-)
+from app.tamper.histogram import SceneChangeDetector
 
 
 class TamperDetector:
 
     def __init__(self, reference_frame):
 
-        self.reference_histogram = calculate_histogram(
+        self.scene_change_detector = SceneChangeDetector(
             reference_frame
         )
 
@@ -32,9 +29,8 @@ class TamperDetector:
         # 3. CAMERA MOVED
         # -----------------------------
 
-        moved, correlation = detect_scene_change(
-            self.reference_histogram,
-            frame
+        moved, correlation = (
+            self.scene_change_detector.detect(frame)
         )
 
         # -----------------------------

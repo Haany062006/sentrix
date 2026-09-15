@@ -8,13 +8,14 @@ from mtcnn import MTCNN
 from keras_facenet import FaceNet
 
 from app.motion.detector import MotionDetector
-
-from app.face.recognizer import (
-    load_registered_faces,
-    recognize_face
-)
-
+from app.face.recognizer import load_registered_faces, recognize_face
 from app.tamper.detector import TamperDetector
+
+from app.database.db import (
+    add_event as add_database_event,
+    add_recording,
+    add_tamper_event
+)
 
 from app.dashboard.dashboard import (
     start_dashboard,
@@ -24,50 +25,235 @@ from app.dashboard.dashboard import (
 )
 
 
-# ==========================================
-# SETTINGS
-# ==========================================
+# ============================================================
+# SENTRIX CONFIGURATION
+# ============================================================
 
 POST_MOTION_SECONDS = 10
-
+EVENT_COOLDOWN = 5
 OUTPUT_FOLDER = "recordings"
 
-EVENT_COOLDOWN = 5
+os.makedirs(OUTPUT_FOLDER, exist_ok=True)
 
 
-# ==========================================
+# ============================================================
 # EVENT CONTROL
-# ==========================================
+# ============================================================
 
-last_event = {}
+last_event_times = {}
 
 
-def log_event(message):
+# ============================================================
+# EVENT LOGGER
+# ============================================================
 
-    global last_event
+def log_event(
+    message,
+    event_key=None,
+    person_name=None,
+    confidence=None,
+    tamper_type=None,
+    brightness=None,
+    blur_variance=None,
+    histogram_correlation=None
+):
+    """
+    Logs events to:
+    1. Console
+    2. Dashboard
+    3. SQLite database
+    """
 
-    now = time.time()
+    global last_event_times
+
+    if event_key is None:
+        event_key = message
+
+    current_time = time.time()
+
+    # Event cooldown
+    if event_key in last_event_times:
+
+        elapsed = (
+            current_time -
+            last_event_times[event_key]
+        )
+
+        if elapsed < EVENT_COOLDOWN:
+            return
+
+    last_event_times[event_key] = current_time
+
+    timestamp = datetime.now().strftime(
+        "%Y-%m-%d %H:%M:%S"
+    )
+
+    full_message = (
+        f"{timestamp} - {message}"
+    )
+
+    # --------------------------------------------------------
+    # CONSOLE
+    # --------------------------------------------------------
+
+    print(full_message)
+
+    # --------------------------------------------------------
+    # DASHBOARD
+    # --------------------------------------------------------
+
+    try:
+
+        add_event(full_message)
+
+    except Exception as e:
+
+        print(
+            "Dashboard event error:",
+            e
+        )
+
+    # --------------------------------------------------------
+    # DATABASE EVENT TYPE
+    # --------------------------------------------------------
+
+    try:
+
+        message_lower = message.lower()
+
+        if "motion detected" in message_lower:
+
+            event_type = "motion"
+
+        elif "tamper detected" in message_lower:
+
+            event_type = "tamper"
+
+        elif "unknown person" in message_lower:
+
+            event_type = "unknown_person"
+
+        elif "recognized" in message_lower:
+
+            event_type = "face_recognized"
+
+        elif "recording started" in message_lower:
+
+            event_type = "recording_start"
+
+        elif "recording stopped" in message_lower:
+
+            event_type = "recording_stop"
+
+        else:
+
+            event_type = "system"
+
+        add_database_event(
+            event_type=event_type,
+            message=message,
+            person_name=person_name,
+            confidence=confidence
+        )
+
+    except Exception as e:
+
+        print(
+            "Database event error:",
+            e
+        )
+
+    # --------------------------------------------------------
+    # TAMPER DATABASE
+    # --------------------------------------------------------
 
     if (
-        message not in last_event
-        or now - last_event[message] > EVENT_COOLDOWN
+        tamper_type is not None
+        and "tamper detected" in message.lower()
     ):
 
-        # Include full date so reports can filter events correctly.
-        timestamp = datetime.now().strftime(
-            "%Y-%m-%d %H:%M:%S"
+        try:
+
+            add_tamper_event(
+                tamper_type=tamper_type,
+                brightness=brightness,
+                blur_variance=blur_variance,
+                histogram_correlation=(
+                    histogram_correlation
+                )
+            )
+
+        except Exception as e:
+
+            print(
+                "Tamper database error:",
+                e
+            )
+
+
+# ============================================================
+# DASHBOARD STATUS
+# ============================================================
+
+def send_dashboard_status(
+    camera="ACTIVE",
+    motion=False,
+    face_detected=False,
+    people=None,
+    tamper="CAMERA OK",
+    tampering=False,
+    recording=False
+):
+
+    if people is None:
+        people = []
+
+    status = {
+
+        "camera": camera,
+
+        "motion": bool(
+            motion
+        ),
+
+        "face_detected": bool(
+            face_detected
+        ),
+
+        "people": list(
+            people
+        ),
+
+        "tamper": str(
+            tamper
+        ),
+
+        "tampering": bool(
+            tampering
+        ),
+
+        "recording": bool(
+            recording
+        )
+    }
+
+    try:
+
+        update_status(
+            status
         )
 
-        add_event(
-            f"{timestamp} - {message}"
+    except Exception as e:
+
+        print(
+            "Dashboard status update error:",
+            e
         )
 
-        last_event[message] = now
 
-
-# ==========================================
+# ============================================================
 # MAIN SENTRIX ENGINE
-# ==========================================
+# ============================================================
 
 def run_sentrix():
 
@@ -77,730 +263,1233 @@ def run_sentrix():
     print("==============================")
     print()
 
-
-    # ======================================
+    # ========================================================
     # CAMERA
-    # ======================================
+    # ========================================================
 
-    print("Opening camera...")
+    print(
+        "Opening camera..."
+    )
 
-    # MSMF is the working Windows camera backend.
     camera = cv2.VideoCapture(
         0,
         cv2.CAP_MSMF
     )
 
-
     if not camera.isOpened():
 
-        print("ERROR: Could not open camera.")
-
-        update_status({
-
-            "camera": "OFFLINE",
-
-            "motion": False,
-
-            "face_detected": False,
-
-            "people": [],
-
-            "tamper": "CAMERA OFFLINE",
-
-            "tampering": True,
-
-            "recording": False
-
-        })
-
-        return
-
-
-    print("Camera opened successfully.")
-
-
-    # ======================================
-    # CREATE RECORDINGS FOLDER
-    # ======================================
-
-    os.makedirs(
-        OUTPUT_FOLDER,
-        exist_ok=True
-    )
-
-
-    # ======================================
-    # INITIAL STATUS
-    # ======================================
-
-    update_status({
-
-        "camera": "ACTIVE",
-
-        "motion": False,
-
-        "face_detected": False,
-
-        "people": [],
-
-        "tamper": "STARTING",
-
-        "tampering": False,
-
-        "recording": False
-
-    })
-
-
-    log_event(
-        "Camera started"
-    )
-
-
-    # ======================================
-    # MOTION DETECTOR
-    # ======================================
-
-    print("Loading motion detector...")
-
-    motion_detector = MotionDetector()
-
-
-    # ======================================
-    # FACE DETECTOR
-    # ======================================
-
-    print("Loading MTCNN...")
-
-    face_detector = MTCNN()
-
-
-    # ======================================
-    # REGISTERED FACES
-    # ======================================
-
-    print("Loading registered faces...")
-
-    registered_faces = (
-        load_registered_faces()
-    )
-
-
-    embedder = None
-
-
-    if registered_faces:
-
-        print("Loading FaceNet...")
-
-        embedder = FaceNet()
-
         print(
-            f"{len(registered_faces)} "
-            "registered face(s) loaded."
-        )
-
-    else:
-
-        print(
-            "No registered faces found."
+            "MSMF camera backend failed."
         )
 
         print(
-            "Face recognition will show UNKNOWN."
-        )
-
-
-    # ======================================
-    # FIRST CAMERA FRAME
-    # ======================================
-
-    success, first_frame = camera.read()
-
-
-    if not success:
-
-        print(
-            "ERROR: Could not read first frame."
+            "Trying default camera backend..."
         )
 
         camera.release()
 
+        camera = cv2.VideoCapture(
+            0
+        )
+
+    if not camera.isOpened():
+
+        print()
+        print(
+            "ERROR: Could not open camera."
+        )
+        print()
+
+        send_dashboard_status(
+            camera="ERROR"
+        )
+
         return
 
-
-    # ======================================
-    # TAMPER DETECTOR
-    # ======================================
-
-    print("Loading tamper detector...")
-
-    tamper_detector = TamperDetector(
-        first_frame
+    print(
+        "Camera opened successfully."
     )
 
+    print()
 
-    # ======================================
+    # ========================================================
+    # MOTION DETECTOR
+    # ========================================================
+
+    print(
+        "Initializing motion detector..."
+    )
+
+    try:
+
+        motion_detector = MotionDetector()
+
+        print(
+            "Motion detector ready."
+        )
+
+    except Exception as e:
+
+        print(
+            "ERROR initializing motion detector:"
+        )
+
+        print(e)
+
+        camera.release()
+
+        send_dashboard_status(
+            camera="ERROR"
+        )
+
+        return
+
+    print()
+
+    # ========================================================
+    # FACE DETECTOR
+    # ========================================================
+
+    print(
+        "Loading MTCNN face detector..."
+    )
+
+    try:
+
+        face_detector = MTCNN()
+
+        print(
+            "Face detector ready."
+        )
+
+    except Exception as e:
+
+        print(
+            "ERROR initializing face detector:"
+        )
+
+        print(e)
+
+        camera.release()
+
+        send_dashboard_status(
+            camera="ERROR"
+        )
+
+        return
+
+    print()
+
+    # ========================================================
+    # FACENET
+    # ========================================================
+
+    print(
+        "Loading FaceNet model..."
+    )
+
+    try:
+
+        embedder = FaceNet()
+
+        print(
+            "FaceNet model loaded successfully."
+        )
+
+    except Exception as e:
+
+        print(
+            "ERROR loading FaceNet:"
+        )
+
+        print(e)
+
+        camera.release()
+
+        send_dashboard_status(
+            camera="ERROR"
+        )
+
+        return
+
+    print()
+
+    # ========================================================
+    # REGISTERED FACES
+    # ========================================================
+
+    print(
+        "Loading registered faces..."
+    )
+
+    try:
+
+        registered_faces = (
+            load_registered_faces()
+        )
+        last_registered_faces_check = time.time()
+
+    except Exception as e:
+
+        print(
+            "ERROR loading registered faces:"
+        )
+
+        print(e)
+
+        registered_faces = {}
+
+    print()
+
+    if registered_faces:
+
+        print(
+            "Registered faces:"
+        )
+
+        for person_name, embeddings in (
+            registered_faces.items()
+        ):
+
+            try:
+
+                embedding_count = len(
+                    embeddings
+                )
+
+            except Exception:
+
+                embedding_count = 1
+
+            print(
+                f"  {person_name}: "
+                f"{embedding_count} embeddings"
+            )
+
+    else:
+
+        print(
+            "WARNING: No registered faces found."
+        )
+
+    print()
+
+    # ========================================================
+    # TAMPER DETECTOR
+    # ========================================================
+
+    tamper_detector = None
+
+    # ========================================================
     # RECORDING VARIABLES
-    # ======================================
+    # ========================================================
 
     recording = False
 
     video_writer = None
 
-    last_motion_time = None
+    last_motion_time = 0
 
+    current_recording_path = None
 
-    # ======================================
-    # START SYSTEM
-    # ======================================
+    recording_start_time = None
 
+    # ========================================================
+    # CURRENT TAMPER STATUS
+    # ========================================================
+
+    current_tamper_status = "CAMERA OK"
+
+    # ========================================================
+    # INITIAL DASHBOARD STATUS
+    # ========================================================
+
+    send_dashboard_status(
+        camera="ACTIVE",
+        motion=False,
+        face_detected=False,
+        people=[],
+        tamper="CAMERA OK",
+        tampering=False,
+        recording=False
+    )
+
+    # ========================================================
+    # SENTRIX READY
+    # ========================================================
+
+    print("==============================")
+    print("       SENTRIX RUNNING")
+    print("==============================")
     print()
-    print("--------------------------------")
-    print("SENTRIX is running.")
-    print("--------------------------------")
-    print()
+
     print(
         "Dashboard:"
     )
+
     print(
         "http://127.0.0.1:5000"
     )
+
     print()
+
     print(
         "Press Q in the camera window to quit."
     )
+
     print()
 
-
-    # ======================================
+    # ========================================================
     # MAIN LOOP
-    # ======================================
+    # ========================================================
 
     while True:
+        if time.time() - last_registered_faces_check >= 5:
+            try:
+                registered_faces = load_registered_faces()
+                last_registered_faces_check = time.time()
+            except Exception as e:
+                print("Face database reload error:", e)
 
+        # ====================================================
+        # CAPTURE FRAME
+        # ====================================================
 
-        # ==================================
-        # READ CAMERA FRAME
-        # ==================================
+        ret, frame = camera.read()
 
-        success, frame = camera.read()
-
-
-        if not success:
+        if not ret:
 
             print(
-                "ERROR: Could not read frame."
+                "ERROR: Failed to read camera frame."
             )
 
-            break
+            time.sleep(0.1)
 
+            continue
 
-        current_time = time.time()
+        # ====================================================
+        # FRAME SIZE
+        # ====================================================
 
-
-        # ==================================
-        # MOTION DETECTION
-        # ==================================
-
-        motion_detected, frame = (
-            motion_detector.detect(frame)
+        frame_height, frame_width = (
+            frame.shape[:2]
         )
 
-
-        if motion_detected:
-
-            log_event(
-                "Motion detected"
-            )
-
-            last_motion_time = (
-                current_time
-            )
-
-
-        # ==================================
-        # TAMPER DETECTION
-        # ==================================
-
-        tamper_result = (
-            tamper_detector.detect(frame)
-        )
-
-
-        tamper_status = (
-            tamper_result["status"]
-        )
-
-
-        if tamper_result["tampering"]:
-
-            log_event(
-                tamper_status
-            )
-
-
-        # ==================================
-        # FACE DETECTION
-        # ==================================
+        # ====================================================
+        # RGB FRAME
+        # ====================================================
 
         rgb_frame = cv2.cvtColor(
             frame,
             cv2.COLOR_BGR2RGB
         )
 
+        # ====================================================
+        # INITIALIZE TAMPER DETECTOR
+        # ====================================================
 
-        faces = (
-            face_detector.detect_faces(
-                rgb_frame
-            )
-        )
+        if tamper_detector is None:
 
+            try:
 
-        recognized_people = []
-
-
-        # ==================================
-        # PROCESS EACH FACE
-        # ==================================
-
-        for face in faces:
-
-
-            x, y, width, height = (
-                face["box"]
-            )
-
-
-            # Prevent negative coordinates.
-
-            x = max(0, x)
-
-            y = max(0, y)
-
-            width = max(0, width)
-
-            height = max(0, height)
-
-
-            # Extract face.
-
-            face_image = rgb_frame[
-                y:y + height,
-                x:x + width
-            ]
-
-
-            if face_image.size == 0:
-
-                continue
-
-
-            # ==================================
-            # FACE RECOGNITION
-            # ==================================
-
-            if embedder is not None:
-
-                try:
-
-                    name, score = recognize_face(
-                        face_image,
-                        embedder,
-                        registered_faces
-                    )
-
-                except Exception as error:
-
-                    print(
-                        "Face recognition error:",
-                        error
-                    )
-
-                    name = "UNKNOWN"
-
-                    score = 0.0
-
-            else:
-
-                name = "UNKNOWN"
-
-                score = 0.0
-
-
-            recognized_people.append(
-                name
-            )
-
-
-            # ==================================
-            # LOG PERSON
-            # ==================================
-
-            if name == "UNKNOWN":
-
-                log_event(
-                    "Unknown person detected"
+                tamper_detector = (
+                    TamperDetector(frame)
                 )
 
-            else:
-
-                log_event(
-                    f"{name} recognized"
+                print(
+                    "Tamper detector initialized."
                 )
 
+            except Exception as e:
 
-            # ==================================
-            # DRAW FACE BOX
-            # ==================================
-
-            if name == "UNKNOWN":
-
-                box_color = (
-                    0,
-                    0,
-                    255
+                print(
+                    "Tamper detector initialization error:",
+                    e
                 )
 
-            else:
+                tamper_detector = None
 
-                box_color = (
-                    0,
-                    255,
-                    0
+        # ====================================================
+        # MOTION DETECTION
+        # ====================================================
+
+        motion_detected = False
+
+        try:
+
+            motion_detected = (
+                motion_detector.detect(
+                    frame
                 )
-
-
-            cv2.rectangle(
-                frame,
-                (x, y),
-                (x + width, y + height),
-                box_color,
-                2
             )
 
+        except Exception as e:
 
-            cv2.putText(
-                frame,
-                f"{name} ({score:.2f})",
-                (
-                    x,
-                    max(25, y - 10)
-                ),
-                cv2.FONT_HERSHEY_SIMPLEX,
-                0.6,
-                box_color,
-                2
+            print(
+                "Motion detection error:",
+                e
             )
 
-
-        # ==================================
-        # START RECORDING
-        # ==================================
+        # ====================================================
+        # MOTION EVENT
+        # ====================================================
 
         if motion_detected:
 
-            last_motion_time = (
-                current_time
+            last_motion_time = time.time()
+
+            log_event(
+                "Motion detected",
+                "motion"
             )
 
+        # ====================================================
+        # TAMPER DETECTION
+        # ====================================================
 
-            if not recording:
+        tamper_detected = False
 
+        current_tamper_status = "CAMERA OK"
 
-                timestamp = (
-                    datetime.now()
-                    .strftime(
-                        "%Y-%m-%d_%H-%M-%S"
+        tamper_brightness = None
+
+        tamper_blur_variance = None
+
+        tamper_histogram_correlation = None
+
+        if tamper_detector is not None:
+
+            try:
+
+                tamper_result = (
+                    tamper_detector.detect(
+                        frame
                     )
                 )
 
+                if isinstance(
+                    tamper_result,
+                    dict
+                ):
 
-                filename = os.path.join(
+                    tamper_detected = bool(
+                        tamper_result.get(
+                            "tampering",
+                            False
+                        )
+                    )
+
+                    current_tamper_status = (
+                        tamper_result.get(
+                            "status",
+                            "CAMERA OK"
+                        )
+                    )
+
+                    tamper_brightness = (
+                        tamper_result.get(
+                            "brightness"
+                        )
+                    )
+
+                    tamper_blur_variance = (
+                        tamper_result.get(
+                            "blur_variance"
+                        )
+                    )
+
+                    tamper_histogram_correlation = (
+                        tamper_result.get(
+                            "histogram_correlation"
+                        )
+                    )
+
+                else:
+
+                    current_tamper_status = str(
+                        tamper_result
+                    )
+
+                # --------------------------------------------
+                # TAMPER EVENT
+                # --------------------------------------------
+
+                if tamper_detected:
+
+                    log_event(
+                        (
+                            f"Tamper detected: "
+                            f"{current_tamper_status}"
+                        ),
+                        (
+                            f"tamper_"
+                            f"{current_tamper_status}"
+                        ),
+                        tamper_type=(
+                            current_tamper_status
+                        ),
+                        brightness=(
+                            tamper_brightness
+                        ),
+                        blur_variance=(
+                            tamper_blur_variance
+                        ),
+                        histogram_correlation=(
+                            tamper_histogram_correlation
+                        )
+                    )
+
+            except Exception as e:
+
+                print(
+                    "Tamper detection error:",
+                    e
+                )
+
+        # ====================================================
+        # FACE DETECTION
+        # ====================================================
+
+        try:
+
+            detections = (
+                face_detector.detect_faces(
+                    rgb_frame
+                )
+            )
+
+        except Exception as e:
+
+            print(
+                "Face detection error:",
+                e
+            )
+
+            detections = []
+
+        # ====================================================
+        # PERSON STATUS
+        # ====================================================
+
+        face_detected = False
+
+        detected_people = []
+
+        # ====================================================
+        # PROCESS FACES
+        # ====================================================
+
+        for detection in detections:
+
+            try:
+
+                # --------------------------------------------
+                # MTCNN CONFIDENCE
+                # --------------------------------------------
+
+                detection_confidence = (
+                    detection.get(
+                        "confidence",
+                        0
+                    )
+                )
+
+                if detection_confidence < 0.90:
+
+                    continue
+
+                # --------------------------------------------
+                # FACE BOUNDING BOX
+                # --------------------------------------------
+
+                x, y, w, h = (
+                    detection["box"]
+                )
+
+                x = max(
+                    0,
+                    x
+                )
+
+                y = max(
+                    0,
+                    y
+                )
+
+                x2 = min(
+                    frame_width,
+                    x + w
+                )
+
+                y2 = min(
+                    frame_height,
+                    y + h
+                )
+
+                if x2 <= x or y2 <= y:
+
+                    continue
+
+                # --------------------------------------------
+                # FACE IMAGE
+                # --------------------------------------------
+
+                face_image = frame[
+                    y:y2,
+                    x:x2
+                ]
+
+                if face_image.size == 0:
+
+                    continue
+
+                face_detected = True
+
+                # --------------------------------------------
+                # FACE RECOGNITION
+                # --------------------------------------------
+
+                try:
+
+                    name, score = (
+                        recognize_face(
+                            face_image,
+                            embedder,
+                            registered_faces
+                        )
+                    )
+
+                except Exception as e:
+
+                    print(
+                        "Face recognition error:",
+                        e
+                    )
+
+                    name = "ERROR"
+
+                    score = 0.0
+
+                # --------------------------------------------
+                # UNKNOWN PERSON
+                # --------------------------------------------
+
+                if name == "UNKNOWN":
+
+                    person_display_name = (
+                        "Unknown Person"
+                    )
+
+                    if (
+                        person_display_name
+                        not in detected_people
+                    ):
+
+                        detected_people.append(
+                            person_display_name
+                        )
+
+                    box_color = (
+                        0,
+                        0,
+                        255
+                    )
+
+                    label = (
+                        f"Unknown "
+                        f"({score:.2f})"
+                    )
+
+                    log_event(
+                        (
+                            f"Unknown person detected "
+                            f"({score:.2f})"
+                        ),
+                        "unknown_person",
+                        confidence=score
+                    )
+
+                # --------------------------------------------
+                # RECOGNITION ERROR
+                # --------------------------------------------
+
+                elif name == "ERROR":
+
+                    person_display_name = (
+                        "Recognition Error"
+                    )
+
+                    if (
+                        person_display_name
+                        not in detected_people
+                    ):
+
+                        detected_people.append(
+                            person_display_name
+                        )
+
+                    box_color = (
+                        0,
+                        255,
+                        255
+                    )
+
+                    label = (
+                        "Recognition Error"
+                    )
+
+                # --------------------------------------------
+                # KNOWN PERSON
+                # --------------------------------------------
+
+                else:
+
+                    person_display_name = (
+                        name
+                    )
+
+                    if (
+                        person_display_name
+                        not in detected_people
+                    ):
+
+                        detected_people.append(
+                            person_display_name
+                        )
+
+                    box_color = (
+                        0,
+                        255,
+                        0
+                    )
+
+                    label = (
+                        f"{name} "
+                        f"({score:.2f})"
+                    )
+
+                    log_event(
+                        (
+                            f"{name} recognized "
+                            f"({score:.2f})"
+                        ),
+                        f"recognized_{name}",
+                        person_name=name,
+                        confidence=score
+                    )
+
+                # --------------------------------------------
+                # DRAW FACE BOX
+                # --------------------------------------------
+
+                cv2.rectangle(
+                    frame,
+                    (x, y),
+                    (x2, y2),
+                    box_color,
+                    2
+                )
+
+                # --------------------------------------------
+                # DRAW NAME
+                # --------------------------------------------
+
+                cv2.putText(
+                    frame,
+                    label,
+                    (
+                        x,
+                        max(
+                            30,
+                            y - 10
+                        )
+                    ),
+                    cv2.FONT_HERSHEY_SIMPLEX,
+                    0.65,
+                    box_color,
+                    2
+                )
+
+            except Exception as e:
+
+                print(
+                    "Face processing error:",
+                    e
+                )
+
+        # ====================================================
+        # START RECORDING
+        # ====================================================
+
+        if (
+            motion_detected
+            and not recording
+        ):
+
+            timestamp = (
+                datetime.now().strftime(
+                    "%Y%m%d_%H%M%S"
+                )
+            )
+
+            current_recording_path = (
+                os.path.join(
                     OUTPUT_FOLDER,
-                    f"motion_{timestamp}.avi"
-                )
-
-
-                height, width = (
-                    frame.shape[:2]
-                )
-
-
-                fourcc = (
-                    cv2.VideoWriter_fourcc(
-                        *"XVID"
+                    (
+                        f"SENTRIX_"
+                        f"{timestamp}.mp4"
                     )
                 )
+            )
 
+            fourcc = (
+                cv2.VideoWriter_fourcc(
+                    *"mp4v"
+                )
+            )
 
-                video_writer = (
-                    cv2.VideoWriter(
-                        filename,
-                        fourcc,
-                        20.0,
-                        (width, height)
+            video_writer = (
+                cv2.VideoWriter(
+                    current_recording_path,
+                    fourcc,
+                    20.0,
+                    (
+                        frame_width,
+                        frame_height
                     )
                 )
+            )
 
+            if video_writer.isOpened():
 
                 recording = True
 
+                recording_start_time = (
+                    time.time()
+                )
+
+                print()
 
                 print(
-                    f"Recording started: "
-                    f"{filename}"
+                    "Recording started:",
+                    current_recording_path
                 )
-
 
                 log_event(
-                    "Recording started"
+                    (
+                        f"Recording started: "
+                        f"{current_recording_path}"
+                    ),
+                    "recording_start"
                 )
 
+            else:
 
-        # ==================================
-        # WRITE RECORDING
-        # ==================================
+                print(
+                    "ERROR: Could not create video."
+                )
 
-        if recording:
+                video_writer.release()
 
-            if video_writer is not None:
+                video_writer = None
+
+                current_recording_path = None
+
+        # ====================================================
+        # WRITE VIDEO
+        # ====================================================
+
+        if (
+            recording
+            and video_writer is not None
+        ):
+
+            try:
 
                 video_writer.write(
                     frame
                 )
 
+            except Exception as e:
 
-            # ==================================
-            # STOP AFTER 10 SECONDS
-            # ==================================
+                print(
+                    "Video writing error:",
+                    e
+                )
+
+        # ====================================================
+        # STOP RECORDING
+        # ====================================================
+
+        if recording:
+
+            elapsed_since_motion = (
+                time.time()
+                - last_motion_time
+            )
 
             if (
-                last_motion_time is not None
-                and
-                current_time -
-                last_motion_time
+                elapsed_since_motion
                 >= POST_MOTION_SECONDS
             ):
 
+                # --------------------------------------------
+                # CALCULATE DURATION
+                # --------------------------------------------
+
+                recording_duration = 0
+
+                if recording_start_time is not None:
+
+                    recording_duration = (
+                        time.time()
+                        - recording_start_time
+                    )
+
+                # --------------------------------------------
+                # RELEASE VIDEO WRITER
+                # --------------------------------------------
 
                 if video_writer is not None:
 
-                    video_writer.release()
+                    try:
 
+                        video_writer.release()
+
+                    except Exception:
+
+                        pass
 
                 video_writer = None
 
                 recording = False
 
-                last_motion_time = None
-
-
                 print(
-                    "Motion stopped. "
-                    "Recording saved."
+                    "Recording stopped."
                 )
 
+                # --------------------------------------------
+                # SAVE USEFUL RECORDING
+                # --------------------------------------------
+
+                if (
+                    current_recording_path is not None
+                    and recording_duration >= 2.0
+                    and os.path.exists(
+                        current_recording_path
+                    )
+                ):
+
+                    try:
+
+                        filename = (
+                            os.path.basename(
+                                current_recording_path
+                            )
+                        )
+
+                        add_recording(
+                            filename=filename,
+                            filepath=current_recording_path,
+                            duration=recording_duration
+                        )
+
+                        print(
+                            "Recording saved to database:"
+                        )
+
+                        print(
+                            f"  File: {filename}"
+                        )
+
+                        print(
+                            f"  Duration: "
+                            f"{recording_duration:.2f} seconds"
+                        )
+
+                    except Exception as e:
+
+                        print(
+                            "Recording database error:",
+                            e
+                        )
+
+                elif current_recording_path is not None:
+
+                    print(
+                        "Recording too short. "
+                        "Not added to database."
+                    )
+
+                # --------------------------------------------
+                # RECORDING STOP EVENT
+                # --------------------------------------------
 
                 log_event(
-                    "Recording stopped"
+                    "Recording stopped",
+                    "recording_stop"
                 )
 
+                recording_start_time = None
 
-        # ==================================
+                current_recording_path = None
+
+        # ====================================================
         # CAMERA STATUS
-        # ==================================
+        # ====================================================
 
         if recording:
 
-            camera_status = (
-                "RECORDING"
-            )
+            camera_status = "RECORDING"
 
         elif motion_detected:
 
-            camera_status = (
-                "MOTION DETECTED"
+            camera_status = "MOTION DETECTED"
+
+        else:
+
+            camera_status = "ACTIVE"
+
+        # ====================================================
+        # UPDATE DASHBOARD STATUS
+        # ====================================================
+
+        send_dashboard_status(
+            camera=camera_status,
+            motion=motion_detected,
+            face_detected=face_detected,
+            people=detected_people,
+            tamper=current_tamper_status,
+            tampering=tamper_detected,
+            recording=recording
+        )
+
+        # ====================================================
+        # CAMERA OVERLAY
+        # ====================================================
+
+        if recording:
+
+            cv2.putText(
+                frame,
+                "RECORDING",
+                (20, 35),
+                cv2.FONT_HERSHEY_SIMPLEX,
+                0.85,
+                (0, 0, 255),
+                2
             )
 
         else:
 
-            camera_status = (
-                "ACTIVE"
+            cv2.putText(
+                frame,
+                "MONITORING",
+                (20, 35),
+                cv2.FONT_HERSHEY_SIMPLEX,
+                0.85,
+                (0, 255, 0),
+                2
             )
 
-
-        # ==================================
-        # UPDATE DASHBOARD STATUS
-        # ==================================
-
-        update_status({
-
-            "camera":
-                camera_status,
-
-            "motion":
-                motion_detected,
-
-            "face_detected":
-                len(faces) > 0,
-
-            "people":
-                recognized_people,
-
-            "tamper":
-                tamper_status,
-
-            "tampering":
-                tamper_result["tampering"],
-
-            "recording":
-                recording
-
-        })
-
-
-        # ==================================
-        # DISPLAY INFORMATION ON CAMERA
-        # ==================================
+        # ====================================================
+        # TAMPER STATUS
+        # ====================================================
 
         cv2.putText(
             frame,
-            f"Camera: {camera_status}",
-            (20, 30),
+            f"Tamper: {current_tamper_status}",
+            (20, 65),
             cv2.FONT_HERSHEY_SIMPLEX,
-            0.7,
-            (0, 255, 0),
+            0.55,
+            (255, 255, 0),
             2
         )
 
+        # ====================================================
+        # UPDATE DASHBOARD FRAME
+        # ====================================================
 
-        cv2.putText(
-            frame,
-            f"Faces: {len(faces)}",
-            (20, 60),
-            cv2.FONT_HERSHEY_SIMPLEX,
-            0.7,
-            (255, 255, 255),
-            2
-        )
+        try:
 
+            update_frame(
+                frame
+            )
 
-        tamper_color = (
-            (0, 0, 255)
-            if tamper_result["tampering"]
-            else
-            (0, 255, 0)
-        )
+        except Exception as e:
 
+            print(
+                "Dashboard frame update error:",
+                e
+            )
 
-        cv2.putText(
-            frame,
-            f"Tamper: {tamper_status}",
-            (20, 90),
-            cv2.FONT_HERSHEY_SIMPLEX,
-            0.7,
-            tamper_color,
-            2
-        )
-
-
-        # ==================================
-        # SEND FRAME TO DASHBOARD
-        # ==================================
-
-        update_frame(
-            frame
-        )
-
-
-        # ==================================
-        # SHOW CAMERA WINDOW
-        # ==================================
+        # ====================================================
+        # DISPLAY CAMERA
+        # ====================================================
 
         cv2.imshow(
-            "SENTRIX - Integrated System",
+            "SENTRIX Smart Surveillance",
             frame
         )
 
+        # ====================================================
+        # KEYBOARD INPUT
+        # ====================================================
 
-        # ==================================
-        # QUIT WITH Q
-        # ==================================
+        key = (
+            cv2.waitKey(1)
+            & 0xFF
+        )
 
-        if (
-            cv2.waitKey(1) & 0xFF
-            == ord("q")
-        ):
+        if key == ord("q"):
+
+            print()
+
+            print(
+                "Q pressed."
+            )
+
+            print(
+                "Stopping SENTRIX..."
+            )
 
             break
 
-
-    # ======================================
+    # ========================================================
     # CLEANUP
-    # ======================================
+    # ========================================================
+
+    print(
+        "Cleaning up..."
+    )
+
+    # --------------------------------------------------------
+    # FINISH ACTIVE RECORDING
+    # --------------------------------------------------------
 
     if video_writer is not None:
 
-        video_writer.release()
+        try:
 
+            video_writer.release()
+
+        except Exception:
+
+            pass
+
+        video_writer = None
+
+        recording_duration = 0
+
+        if recording_start_time is not None:
+
+            recording_duration = (
+                time.time()
+                - recording_start_time
+            )
+
+        # ----------------------------------------------------
+        # SAVE ACTIVE RECORDING IF USEFUL
+        # ----------------------------------------------------
+
+        if (
+            current_recording_path is not None
+            and recording_duration >= 2.0
+            and os.path.exists(
+                current_recording_path
+            )
+        ):
+
+            try:
+
+                filename = (
+                    os.path.basename(
+                        current_recording_path
+                    )
+                )
+
+                add_recording(
+                    filename=filename,
+                    filepath=current_recording_path,
+                    duration=recording_duration
+                )
+
+                print(
+                    "Final recording saved to database:"
+                )
+
+                print(
+                    f"  File: {filename}"
+                )
+
+                print(
+                    f"  Duration: "
+                    f"{recording_duration:.2f} seconds"
+                )
+
+            except Exception as e:
+
+                print(
+                    "Final recording database error:",
+                    e
+                )
+
+        elif current_recording_path is not None:
+
+            print(
+                "Recording too short. "
+                "Not added to database."
+            )
+
+        recording_start_time = None
+
+        current_recording_path = None
+
+        recording = False
+
+    # --------------------------------------------------------
+    # RELEASE CAMERA
+    # --------------------------------------------------------
 
     camera.release()
 
-
     cv2.destroyAllWindows()
 
-
-    # ======================================
+    # ========================================================
     # FINAL DASHBOARD STATUS
-    # ======================================
+    # ========================================================
 
-    update_status({
-
-        "camera":
-            "OFFLINE",
-
-        "motion":
-            False,
-
-        "face_detected":
-            False,
-
-        "people":
-            [],
-
-        "tamper":
-            "SYSTEM STOPPED",
-
-        "tampering":
-            False,
-
-        "recording":
-            False
-
-    })
-
-
-    print()
-    print(
-        "SENTRIX stopped."
+    send_dashboard_status(
+        camera="STOPPED",
+        motion=False,
+        face_detected=False,
+        people=[],
+        tamper="CAMERA OK",
+        tampering=False,
+        recording=False
     )
 
+    print()
 
-# ==========================================
-# START DASHBOARD + SENTRIX
-# ==========================================
+    print("==============================")
+    print("       SENTRIX STOPPED")
+    print("==============================")
+    print()
+
+
+# ============================================================
+# PROGRAM ENTRY POINT
+# ============================================================
 
 if __name__ == "__main__":
-
 
     dashboard_thread = threading.Thread(
         target=start_dashboard,
         daemon=True
     )
 
-
     dashboard_thread.start()
 
+    time.sleep(2)
 
     run_sentrix()

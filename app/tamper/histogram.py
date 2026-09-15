@@ -1,8 +1,13 @@
 import cv2
 
 
-# Lower correlation = bigger scene change
-HISTOGRAM_THRESHOLD = 0.15
+# A scene is considered changed only when the
+# correlation is very low.
+HISTOGRAM_THRESHOLD = -0.20
+
+# Number of consecutive changed frames required
+# before declaring camera movement.
+CHANGE_CONFIRMATION_FRAMES = 15
 
 
 def calculate_histogram(frame):
@@ -26,6 +31,44 @@ def calculate_histogram(frame):
     )
 
     return histogram
+
+
+class SceneChangeDetector:
+
+    def __init__(self, reference_frame):
+
+        self.reference_histogram = calculate_histogram(
+            reference_frame
+        )
+
+        self.changed_frames = 0
+
+    def detect(self, current_frame):
+
+        current_histogram = calculate_histogram(
+            current_frame
+        )
+
+        correlation = cv2.compareHist(
+            self.reference_histogram,
+            current_histogram,
+            cv2.HISTCMP_CORREL
+        )
+
+        if correlation < HISTOGRAM_THRESHOLD:
+
+            self.changed_frames += 1
+
+        else:
+
+            self.changed_frames = 0
+
+        moved = (
+            self.changed_frames
+            >= CHANGE_CONFIRMATION_FRAMES
+        )
+
+        return moved, correlation
 
 
 def detect_scene_change(
