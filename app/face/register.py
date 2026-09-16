@@ -20,8 +20,128 @@ SAMPLES_REQUIRED = 40
 CAMERA_INDEX = 0
 
 MIN_CONFIDENCE = 0.90
+
 MIN_FACE_WIDTH = 80
 MIN_FACE_HEIGHT = 80
+
+# Blur protection.
+# Higher value = stricter.
+MIN_BLUR_VARIANCE = 80.0
+
+# Prevent almost identical frames from being captured.
+MIN_FRAME_DIFFERENCE = 0.03
+
+# Padding around detected face.
+FACE_PADDING = 0.20
+
+
+# ============================================================
+# HELPER FUNCTIONS
+# ============================================================
+
+def calculate_blur_score(image):
+    """
+    Measures image sharpness using Laplacian variance.
+    Higher value generally means a sharper image.
+    """
+    gray = cv2.cvtColor(
+        image,
+        cv2.COLOR_BGR2GRAY
+    )
+
+    return cv2.Laplacian(
+        gray,
+        cv2.CV_64F
+    ).var()
+
+
+def calculate_frame_difference(current, previous):
+    """
+    Calculates normalized difference between two face images.
+    Returns a value between approximately 0 and 1.
+    """
+    if previous is None:
+        return 1.0
+
+    current_gray = cv2.cvtColor(
+        current,
+        cv2.COLOR_BGR2GRAY
+    )
+
+    previous_gray = cv2.cvtColor(
+        previous,
+        cv2.COLOR_BGR2GRAY
+    )
+
+    current_gray = cv2.resize(
+        current_gray,
+        (64, 64)
+    )
+
+    previous_gray = cv2.resize(
+        previous_gray,
+        (64, 64)
+    )
+
+    difference = cv2.absdiff(
+        current_gray,
+        previous_gray
+    )
+
+    return float(
+        np.mean(difference) / 255.0
+    )
+
+
+def crop_face_with_padding(
+    frame,
+    box
+):
+    """
+    Crops the detected face with a small margin.
+    """
+    x, y, width, height = box
+
+    padding_x = int(
+        width * FACE_PADDING
+    )
+
+    padding_y = int(
+        height * FACE_PADDING
+    )
+
+    x1 = max(
+        0,
+        x - padding_x
+    )
+
+    y1 = max(
+        0,
+        y - padding_y
+    )
+
+    x2 = min(
+        frame.shape[1],
+        x + width + padding_x
+    )
+
+    y2 = min(
+        frame.shape[0],
+        y + height + padding_y
+    )
+
+    face = frame[
+        y1:y2,
+        x1:x2
+    ]
+
+    if face.size == 0:
+        return None
+
+    return cv2.resize(
+        face,
+        (160, 160)
+    )
 
 
 # ============================================================
@@ -36,7 +156,10 @@ def register_person():
 
     if not name:
 
-        print("ERROR: Name cannot be empty.")
+        print(
+            "ERROR: Name cannot be empty."
+        )
+
         return
 
     # --------------------------------------------------------
@@ -86,7 +209,7 @@ def register_person():
     if image_count >= SAMPLES_REQUIRED:
 
         print(
-            "The dataset already contains "
+            f"The dataset already contains "
             f"{image_count} images."
         )
 
@@ -104,10 +227,12 @@ def register_person():
         return
 
     # --------------------------------------------------------
-    # LOAD MODELS
+    # LOAD MTCNN
     # --------------------------------------------------------
 
-    print("Loading MTCNN...")
+    print(
+        "Loading MTCNN..."
+    )
 
     detector = MTCNN()
 
@@ -115,7 +240,9 @@ def register_person():
     # CAMERA
     # --------------------------------------------------------
 
-    print("Opening camera...")
+    print(
+        "Opening camera..."
+    )
 
     camera = cv2.VideoCapture(
         CAMERA_INDEX,
@@ -132,17 +259,24 @@ def register_person():
 
     print()
     print("------------------------------------------")
-    print("CAPTURE INSTRUCTIONS")
+    print("STABLE CAPTURE INSTRUCTIONS")
     print("------------------------------------------")
     print("Only ONE person should be visible.")
+    print("Look directly at the camera first.")
     print("Keep your face clearly visible.")
-    print("Change your head angle slightly.")
-    print("Change expression naturally.")
+    print("Move your head slightly between captures.")
+    print("Change angle and expression naturally.")
+    print()
+    print("GREEN = face is ready")
+    print("YELLOW = improve quality")
+    print("RED = cannot capture")
     print()
     print("Press SPACE to capture.")
     print("Press Q to cancel.")
     print("------------------------------------------")
     print()
+
+    previous_face = None
 
     # --------------------------------------------------------
     # CAPTURE LOOP
@@ -170,6 +304,8 @@ def register_person():
         )
 
         valid_face = None
+        blur_score = 0.0
+        current_face = None
 
         # ----------------------------------------------------
         # EXACTLY ONE FACE
@@ -186,11 +322,29 @@ def register_person():
 
             x, y, width, height = face["box"]
 
-            x = max(0, x)
-            y = max(0, y)
+            x = max(
+                0,
+                x
+            )
 
-            width = max(0, width)
-            height = max(0, height)
+            y = max(
+                0,
+                y
+            )
+
+            width = max(
+                0,
+                width
+            )
+
+            height = max(
+                0,
+                height
+            )
+
+            # -----------------------------------------------
+            # FACE QUALITY CHECK
+            # -----------------------------------------------
 
             if (
                 confidence >= MIN_CONFIDENCE
@@ -200,12 +354,30 @@ def register_person():
                 height >= MIN_FACE_HEIGHT
             ):
 
-                valid_face = (
-                    x,
-                    y,
-                    width,
-                    height
+                current_face = crop_face_with_padding(
+                    frame,
+                    (
+                        x,
+                        y,
+                        width,
+                        height
+                    )
                 )
+
+                if current_face is not None:
+
+                    blur_score = calculate_blur_score(
+                        current_face
+                    )
+
+                    if blur_score >= MIN_BLUR_VARIANCE:
+
+                        valid_face = (
+                            x,
+                            y,
+                            width,
+                            height
+                        )
 
         # ----------------------------------------------------
         # DISPLAY
@@ -214,6 +386,29 @@ def register_person():
         if valid_face is not None:
 
             x, y, width, height = valid_face
+
+            difference = calculate_frame_difference(
+                current_face,
+                previous_face
+            )
+
+            if previous_face is None:
+
+                quality_message = (
+                    "FACE READY - SPACE TO CAPTURE"
+                )
+
+            elif difference >= MIN_FRAME_DIFFERENCE:
+
+                quality_message = (
+                    "GOOD VARIATION - SPACE TO CAPTURE"
+                )
+
+            else:
+
+                quality_message = (
+                    "TOO SIMILAR - MOVE SLIGHTLY"
+                )
 
             cv2.rectangle(
                 frame,
@@ -225,10 +420,20 @@ def register_person():
 
             cv2.putText(
                 frame,
-                "FACE READY - SPACE TO CAPTURE",
+                quality_message,
                 (20, 40),
                 cv2.FONT_HERSHEY_SIMPLEX,
-                0.7,
+                0.65,
+                (0, 255, 0),
+                2
+            )
+
+            cv2.putText(
+                frame,
+                f"Sharpness: {blur_score:.0f}",
+                (20, 70),
+                cv2.FONT_HERSHEY_SIMPLEX,
+                0.60,
                 (0, 255, 0),
                 2
             )
@@ -260,7 +465,7 @@ def register_person():
         cv2.putText(
             frame,
             f"Images: {image_count}/{SAMPLES_REQUIRED}",
-            (20, 75),
+            (20, 105),
             cv2.FONT_HERSHEY_SIMPLEX,
             0.7,
             (255, 255, 255),
@@ -268,7 +473,7 @@ def register_person():
         )
 
         cv2.imshow(
-            "SENTRIX - Face Dataset Registration",
+            "SENTRIX - Stable Face Registration",
             frame
         )
 
@@ -278,54 +483,97 @@ def register_person():
 
         key = cv2.waitKey(1) & 0xFF
 
-        # SPACE
+        # ----------------------------------------------------
+        # SPACE - CAPTURE
+        # ----------------------------------------------------
+
         if key == 32:
 
             if valid_face is None:
 
                 print(
-                    "Cannot capture. "
-                    "Make sure exactly one clear face "
-                    "is visible."
+                    "Cannot capture."
+                )
+
+                if len(faces) == 0:
+
+                    print(
+                        "Reason: Face not detected."
+                    )
+
+                elif len(faces) > 1:
+
+                    print(
+                        "Reason: Multiple faces detected."
+                    )
+
+                else:
+
+                    print(
+                        "Reason: Face quality is too low."
+                    )
+
+                continue
+
+            difference = calculate_frame_difference(
+                current_face,
+                previous_face
+            )
+
+            if (
+                previous_face is not None
+                and
+                difference < MIN_FRAME_DIFFERENCE
+            ):
+
+                print(
+                    "Capture rejected: "
+                    "too similar to previous image."
+                )
+
+                print(
+                    "Move your head slightly."
                 )
 
                 continue
 
-            x, y, width, height = valid_face
-
-            face_image = frame[
-                y:y + height,
-                x:x + width
-            ]
-
-            if face_image.size == 0:
-                continue
-
-            # Resize face
-            face_image = cv2.resize(
-                face_image,
-                (160, 160)
-            )
-
-            image_count += 1
+            # ------------------------------------------------
+            # SAVE FACE
+            # ------------------------------------------------
 
             filename = os.path.join(
                 person_folder,
-                f"{image_count:03d}.jpg"
+                f"{image_count + 1:03d}.jpg"
             )
 
-            cv2.imwrite(
+            success = cv2.imwrite(
                 filename,
-                face_image
+                current_face
             )
+
+            if not success:
+
+                print(
+                    "ERROR: Could not save image."
+                )
+
+                continue
+
+            image_count += 1
+
+            previous_face = current_face.copy()
 
             print(
                 f"Captured "
-                f"{image_count}/{SAMPLES_REQUIRED}: "
-                f"{filename}"
+                f"{image_count}/{SAMPLES_REQUIRED} | "
+                f"Sharpness: {blur_score:.0f} | "
+                f"Variation: {difference:.3f}"
             )
 
-        # Q
+        # ----------------------------------------------------
+        # Q - CANCEL
+        # ----------------------------------------------------
+
         elif key == ord("q"):
 
             print(
@@ -335,6 +583,7 @@ def register_person():
             break
 
     camera.release()
+
     cv2.destroyAllWindows()
 
     # --------------------------------------------------------
@@ -349,7 +598,7 @@ def register_person():
         )
 
         print(
-            "Need "
+            f"Need "
             f"{SAMPLES_REQUIRED - image_count} more."
         )
 
@@ -357,7 +606,7 @@ def register_person():
 
     print()
     print(
-        "40 images captured successfully."
+        "40 quality-controlled images captured successfully."
     )
 
     # --------------------------------------------------------
@@ -424,7 +673,9 @@ def generate_embeddings_from_dataset(
             filename
         )
 
-        image = cv2.imread(filepath)
+        image = cv2.imread(
+            filepath
+        )
 
         if image is None:
 
@@ -435,13 +686,33 @@ def generate_embeddings_from_dataset(
 
             continue
 
-        # Convert BGR to RGB
+        # ----------------------------------------------------
+        # CHECK BLUR AGAIN
+        # ----------------------------------------------------
+
+        blur_score = calculate_blur_score(
+            image
+        )
+
+        if blur_score < MIN_BLUR_VARIANCE:
+
+            print(
+                f"Skipping blurry image: "
+                f"{filename} "
+                f"(sharpness={blur_score:.1f})"
+            )
+
+            continue
+
+        # ----------------------------------------------------
+        # RGB
+        # ----------------------------------------------------
+
         image = cv2.cvtColor(
             image,
             cv2.COLOR_BGR2RGB
         )
 
-        # FaceNet expects 160x160
         image = cv2.resize(
             image,
             (160, 160)
@@ -452,17 +723,54 @@ def generate_embeddings_from_dataset(
             axis=0
         )
 
+        # ----------------------------------------------------
+        # FACENET
+        # ----------------------------------------------------
+
         embedding = embedder.embeddings(
             image
         )[0]
 
-        # Normalize
-        embedding = embedding / (
-            np.linalg.norm(embedding) + 1e-10
+        # ----------------------------------------------------
+        # NORMALIZE
+        # ----------------------------------------------------
+
+        norm = np.linalg.norm(
+            embedding
         )
 
+        if norm < 1e-10:
+
+            print(
+                f"Skipping invalid embedding: "
+                f"{filename}"
+            )
+
+            continue
+
+        embedding = (
+            embedding / norm
+        )
+
+        # ----------------------------------------------------
+        # EMBEDDING QUALITY CHECK
+        # ----------------------------------------------------
+
+        if not np.all(
+            np.isfinite(embedding)
+        ):
+
+            print(
+                f"Skipping invalid values: "
+                f"{filename}"
+            )
+
+            continue
+
         embeddings.append(
-            embedding.astype(np.float32)
+            embedding.astype(
+                np.float32
+            )
         )
 
         print(
@@ -474,7 +782,7 @@ def generate_embeddings_from_dataset(
     if not embeddings:
 
         print(
-            "ERROR: No embeddings generated."
+            "ERROR: No valid embeddings generated."
         )
 
         return
@@ -518,6 +826,7 @@ def generate_embeddings_from_dataset(
     print(f"Saved      : {person_file}")
     print("==========================================")
     print()
+
     add_person(
         name=name,
         role="Person"
