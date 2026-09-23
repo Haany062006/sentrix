@@ -2,61 +2,156 @@
 
 ## 1. Project Overview
 
-**SENTRIX** is an AIoT-based smart surveillance system that combines real-time video monitoring, motion detection, facial recognition, camera tamper detection, event logging, video recording, voice alerts, and automated security report generation.
+**SENTRIX** is an AIoT-based smart surveillance system designed for real-time security monitoring. It combines computer vision, motion detection, facial recognition, camera tamper detection, event logging, automatic video recording, voice alerts, a web-based dashboard, and automated PDF security reporting.
 
-Unlike a traditional CCTV system that mainly records video for later inspection, SENTRIX continuously analyzes the camera feed and identifies important security events in real time.
+Unlike a traditional CCTV system that mainly records video for later inspection, SENTRIX processes the live camera feed and identifies important security events in real time.
 
-The system uses a laptop camera as the surveillance device and provides a web-based dashboard that can be accessed from a phone connected to the same Wi-Fi network.
+The system uses a laptop camera as the surveillance device and provides a web dashboard that can be accessed from the laptop or from a smartphone connected to the same local network.
+
+SENTRIX is developed as an academic prototype demonstrating the integration of **Artificial Intelligence, Internet of Things concepts, computer vision, web technologies, database management, and automated security reporting**.
 
 ---
 
-## 2. Main Features
+# 2. Main Features
 
-### Real-Time Camera Monitoring
+## Real-Time Camera Monitoring
 
 * Captures live video using the laptop camera.
+* Processes the camera feed continuously.
 * Displays the live camera feed through the SENTRIX dashboard.
-* Supports access from another device such as a smartphone.
+* Provides camera status information through the dashboard.
+* Supports dashboard access from another device connected to the same Wi-Fi network.
 
-### Motion Detection
+---
 
-* Continuously analyzes video frames for movement.
-* Uses grayscale conversion, Gaussian blur, frame differencing, thresholding, dilation, and contour detection.
-* Starts video recording when significant motion is detected.
-* Continues recording for a short period after the last detected movement.
+## Motion Detection
 
-### Facial Recognition
+SENTRIX continuously analyzes consecutive camera frames to identify significant movement.
 
-* Detects faces from the live camera feed.
-* Uses **FaceNet** embeddings for facial recognition.
-* Supports registered team members.
-* Uses multiple face embeddings when available to improve recognition reliability.
-* Identifies unknown persons when the detected face does not sufficiently match a registered person.
+The motion detection pipeline uses:
 
-### Person Registration
+* Grayscale conversion
+* Gaussian blur
+* Frame differencing
+* Thresholding
+* Dilation
+* Contour detection
+* Minimum contour-area filtering
+
+When sufficient motion is detected:
+
+1. A motion event is generated.
+2. The event is stored in SQLite.
+3. Video recording is started automatically.
+4. Recording continues while motion is detected.
+5. Recording continues for a configured period after the last detected motion.
+6. The recording is stored in the `recordings/` directory.
+
+---
+
+## Facial Recognition
+
+SENTRIX uses:
+
+* **MTCNN** for face detection
+* **FaceNet** for facial feature embeddings
+* Similarity-based comparison for recognition
+
+The system supports:
+
+* Registered-person recognition
+* Unknown-person detection
+* Multiple stored face embeddings for a registered person
+* Confidence/similarity information in recorded recognition events
+
+During recognition, the detected face is converted into a numerical FaceNet embedding and compared against stored registered embeddings.
+
+The configured recognition threshold is:
+
+```text
+0.60
+```
+
+Recognition performance depends on:
+
+* Lighting
+* Camera quality
+* Face position
+* Face angle
+* Registration image quality
+* Distance from the camera
+
+---
+
+## Person Registration
 
 New people can be registered using the face registration module.
 
-The registration process:
+The registration process is:
 
-1. Captures face images.
-2. Generates FaceNet embeddings.
-3. Saves the embeddings in `registered_faces/`.
-4. Automatically registers the person in the SQLite database.
+1. Enter the person's name.
+2. Capture multiple face images.
+3. Detect the face.
+4. Generate FaceNet embeddings.
+5. Store the embeddings in `registered_faces/`.
+6. Register the person in the SQLite database.
 
-### Camera Tamper Detection
+Registration command:
 
-SENTRIX monitors the camera for possible tampering conditions such as:
+```powershell
+python -m app.face.register
+```
 
-* Lens obstruction or covering
-* Excessive blur
-* Sudden camera movement
+After registration, SENTRIX can automatically reload registered face information while the system is running.
 
-The tamper detector uses image brightness, blur variance, and histogram comparison to identify abnormal camera conditions.
+---
 
-### Video Recording
+## Unknown-Person Detection
 
-When motion is detected, SENTRIX automatically records the event.
+If a detected face does not sufficiently match any registered identity, SENTRIX classifies the person as an **unknown person**.
+
+The system records an unknown-person event in the database.
+
+The dashboard can display the event, and browser-based voice alerts can be used to notify the user.
+
+Unknown-person events are also included in the daily security report.
+
+---
+
+## Camera Tamper Detection
+
+SENTRIX monitors the camera for possible tampering conditions.
+
+The current tamper detection system checks:
+
+### Lens Obstruction
+
+Brightness information is used to identify conditions where the camera lens may be covered or obstructed.
+
+### Camera Blur
+
+Blur variance is analyzed using image sharpness information. A significant reduction in sharpness can indicate that the camera has become blurred or obstructed.
+
+### Camera Movement
+
+Histogram comparison is used to identify significant visual changes that may indicate that the camera position has changed.
+
+Possible tamper conditions include:
+
+```text
+CAMERA OK
+LENS COVERED
+CAMERA BLURRED
+CAMERA MOVED
+```
+
+Multiple consecutive frames are considered to reduce false detections caused by normal temporary changes.
+
+---
+
+# 3. Video Recording
+
+SENTRIX automatically records video when significant motion is detected.
 
 Recordings are stored in:
 
@@ -64,72 +159,184 @@ Recordings are stored in:
 recordings/
 ```
 
-The dashboard can display available recordings.
+The filename contains the recording timestamp.
 
-### Security Event Logging
+Example:
 
-Important events are recorded, including:
+```text
+SENTRIX_20260915_220647.mp4
+```
+
+Very short recordings are ignored by the database system to avoid storing meaningless video entries.
+
+Each valid recording is associated with information such as:
+
+* Filename
+* File path
+* Creation time
+* Duration
+
+The available recordings can be viewed through the SENTRIX dashboard.
+
+---
+
+# 4. 15-Day Recording Retention
+
+SENTRIX includes an automatic recording-retention mechanism.
+
+Physical video files are retained for approximately **15 days**.
+
+When SENTRIX starts, the system checks existing recording records and removes physical video files older than the configured retention period.
+
+The current retention period is:
+
+```text
+15 days
+```
+
+### Important behavior
+
+If a recording is older than the retention period:
+
+* The physical `.mp4` file is deleted.
+* The corresponding database record is retained.
+* The historical recording information can still appear in database-based reports.
+* The deleted video itself can no longer be viewed unless it was backed up separately.
+
+The database record is intentionally retained so that SENTRIX can maintain a historical security record even after the physical video has been removed.
+
+---
+
+# 5. Security Event Logging
+
+SENTRIX stores important security events in an SQLite database.
+
+Events can include:
 
 * Motion detected
-* Known person detected
+* Registered person detected
 * Unknown person detected
 * Camera tampering
 * Recording started
 * Recording stopped
+* System events
 
-SENTRIX stores structured security information using SQLite.
-
-Database:
+Database location:
 
 ```text
 data/sentrix.db
 ```
 
-### Web Dashboard
+Each event can contain information such as:
 
-The SENTRIX dashboard provides:
+* Timestamp
+* Event type
+* Message
+* Person name where applicable
+* Recognition confidence where available
+
+The event database forms the basis of the daily security report.
+
+---
+
+# 6. Web Dashboard
+
+The SENTRIX dashboard provides a centralized interface for monitoring the system.
+
+The dashboard can display:
 
 * Live camera feed
 * Camera status
 * Motion status
-* Face detection status
-* Detected people
+* Face detection/recognition status
+* Detected person information
 * Tamper status
 * Recording status
 * Recent security events
 * Available recordings
-* Security report generation
+* Security reports
 * Voice alert controls
 
-### Laptop-to-Phone Monitoring
+The dashboard is implemented using:
 
-The laptop runs the SENTRIX Flask server.
+* Flask
+* HTML
+* CSS
+* JavaScript
 
-A phone connected to the same Wi-Fi network can access the dashboard using:
+---
+
+# 7. Laptop-to-Phone Monitoring
+
+SENTRIX runs a Flask web server on the laptop.
+
+The dashboard can be accessed locally using:
+
+```text
+http://127.0.0.1:5000
+```
+
+For access from a smartphone connected to the same Wi-Fi network, use:
 
 ```text
 http://<LAPTOP-IP>:5000
 ```
 
-For example:
+Example:
 
 ```text
 http://192.168.1.10:5000
 ```
 
-The exact IP address depends on the laptop's network.
+The actual IP address depends on the laptop's active network connection.
 
-### Voice Alerts
+To find the laptop IP address on Windows:
 
-SENTRIX supports browser-based voice alerts using the Web Speech API.
+```powershell
+ipconfig
+```
 
-Voice alerts can notify the user about important security events.
+Look for the **IPv4 Address** of the active Wi-Fi or Ethernet adapter.
+
+### Requirements for mobile access
+
+* Laptop and phone should be connected to the same local network.
+* Flask must be running.
+* The laptop firewall/network configuration must allow the connection.
+* The correct laptop IP address must be used.
+
+---
+
+# 8. Voice Alerts
+
+SENTRIX supports browser-based voice announcements using the **Web Speech API**.
+
+Voice alerts can be used for important security events such as:
+
+* Registered person detection
+* Unknown-person detection
+* Camera tampering
+* Other configured security events
+
+Example announcements can include:
+
+```text
+Dharshana detected.
+```
+
+or:
+
+```text
+Unknown person detected.
+```
 
 Voice functionality depends on browser and device support for speech synthesis.
 
-### PDF Security Reports
+---
 
-SENTRIX can generate daily security reports containing information about detected security events and recordings.
+# 9. Automated PDF Security Reports
+
+SENTRIX can generate a professional daily security report from the information stored in the database.
 
 Generated reports are stored in:
 
@@ -137,9 +344,100 @@ Generated reports are stored in:
 reports/
 ```
 
+Example:
+
+```text
+reports/SENTRIX_Report_2026-09-23.pdf
+```
+
+The report generator is implemented using:
+
+```text
+ReportLab
+```
+
+The report can include:
+
+* Report date
+* Analysis period
+* Report generation time
+* Overall security state
+* Total security events
+* Motion activity
+* Known-person activity
+* Unknown-person activity
+* Camera tamper activity
+* Recognized people
+* Face recognition details
+* Video recording information
+* Recording duration
+* Complete chronological security timeline
+* Day reconstruction
+* Camera integrity information
+* End-of-report system assessment
+
 ---
 
-## 3. System Architecture
+# 10. Daily Security Report Structure
+
+The generated report is designed to reconstruct the security activity recorded during the selected day.
+
+The report contains sections such as:
+
+### 01 — What Happened Today
+
+Provides an overview of the recorded security activity.
+
+### 02 — Daily Intelligence
+
+Summarizes:
+
+* First event
+* Latest event
+* Motion activity
+* Known-person activity
+* Unknown activity
+* Camera integrity events
+* Video evidence
+* Total recorded duration
+
+### 03 — Recognized People
+
+Lists registered identities detected during the reporting period.
+
+### 04 — Unknown-Person Activity
+
+Provides chronological information about unknown-person detections.
+
+### 05 — Camera Integrity
+
+Displays recorded tamper conditions and available camera-analysis values.
+
+### 06 — Video Evidence
+
+Lists recordings associated with the selected reporting period.
+
+### 07 — Complete Security Timeline
+
+Provides the recorded events in chronological order.
+
+### 08 — Day Reconstruction
+
+Creates a chronological narrative based on the events stored in the database.
+
+### 09 — Face Recognition Details
+
+Provides recognition timestamps, person names, and available confidence information.
+
+### 10 — End-of-Report System Assessment
+
+Provides a final factual summary of the recorded security activity.
+
+The report only describes information stored by SENTRIX and does not invent events that were not recorded.
+
+---
+
+# 11. System Architecture
 
 ```text
                     ┌─────────────────────┐
@@ -172,7 +470,7 @@ reports/
        ┌────────────┐   ┌────────────┐   ┌────────────┐
        │   Video    │   │  SQLite    │   │   PDF      │
        │ Recording  │   │  Database  │   │  Reports   │
-       └────────────┘   └────────────┘   └────────────┘
+       └────────────┘   └──────┬─────┘   └────────────┘
                                │
                                ▼
                     ┌─────────────────────┐
@@ -190,7 +488,7 @@ reports/
 
 ---
 
-## 4. Project Structure
+# 12. Project Structure
 
 ```text
 sentrix/
@@ -220,7 +518,7 @@ sentrix/
 │   ├── motion/
 │   │   └── detector.py
 │   │
-│   ├── reports/
+│   ├── report/
 │   │   └── generator.py
 │   │
 │   └── tamper/
@@ -245,9 +543,23 @@ sentrix/
 └── .gitignore
 ```
 
+### Important directory distinction
+
+The source code for report generation is:
+
+```text
+app/report/generator.py
+```
+
+Generated PDF reports are stored separately in:
+
+```text
+reports/
+```
+
 ---
 
-## 5. Technologies Used
+# 13. Technologies Used
 
 | Component            | Technology              |
 | -------------------- | ----------------------- |
@@ -265,16 +577,18 @@ sentrix/
 
 ---
 
-## 6. Installation
+# 14. Installation
 
-### Step 1 — Clone the repository
+## Step 1 — Clone the Repository
 
 ```bash
 git clone <repository-url>
 cd sentrix
 ```
 
-### Step 2 — Create a virtual environment
+---
+
+## Step 2 — Create a Virtual Environment
 
 Windows:
 
@@ -282,13 +596,21 @@ Windows:
 python -m venv venv
 ```
 
-Activate it:
+Activate the environment:
 
 ```powershell
 .\venv\Scripts\Activate.ps1
 ```
 
-### Step 3 — Install dependencies
+If PowerShell execution policy prevents activation, use Command Prompt:
+
+```cmd
+venv\Scripts\activate
+```
+
+---
+
+## Step 3 — Install Dependencies
 
 ```powershell
 pip install -r requirements.txt
@@ -296,83 +618,98 @@ pip install -r requirements.txt
 
 ---
 
-## 7. Running SENTRIX
+# 15. Running SENTRIX
 
-Start the system using:
+Start the application using:
 
 ```powershell
 python -m app.main
 ```
 
-The Flask dashboard runs on:
+The local dashboard is available at:
 
 ```text
 http://127.0.0.1:5000
 ```
 
-For access from a phone on the same Wi-Fi network:
+For mobile access:
 
 ```text
 http://<LAPTOP-IP>:5000
 ```
 
-Find the laptop's IP address using:
+Example:
 
-```powershell
-ipconfig
+```text
+http://192.168.1.10:5000
 ```
-
-Look for the **IPv4 Address** of the active network adapter.
 
 ---
 
-## 8. Registering a New Person
+# 16. Registering a New Person
 
-To register a new person:
+Before registering a new person, make sure SENTRIX is not currently using the camera.
 
-1. Stop SENTRIX if it is currently using the camera.
-2. Run:
+Run:
 
 ```powershell
 python -m app.face.register
 ```
 
-3. Enter the person's name.
-4. Follow the instructions to capture the face images.
-5. The system generates the face embeddings automatically.
-6. The person's information is added to the SQLite database.
+Then:
 
-After registration, restart SENTRIX.
+1. Enter the person's name.
+2. Follow the registration instructions.
+3. Capture the required face images.
+4. Generate FaceNet embeddings.
+5. Store the embeddings in `registered_faces/`.
+6. Add the person to the SQLite database.
+7. Restart SENTRIX if required.
 
-The face recognition system automatically reloads registered face data periodically.
+The recognition module periodically reloads registered face information.
 
 ---
 
-## 9. Face Recognition
+# 17. Face Recognition
 
-SENTRIX uses FaceNet to convert detected faces into numerical embeddings.
+SENTRIX uses FaceNet to convert detected faces into numerical feature embeddings.
 
-Each embedding contains **512 numerical values** representing facial features.
+The recognition pipeline is:
 
-During recognition, the live face embedding is compared with the stored registered embeddings.
+```text
+Camera Frame
+     ↓
+Face Detection
+     ↓
+Face Extraction
+     ↓
+FaceNet Embedding
+     ↓
+Compare With Registered Embeddings
+     ↓
+Similarity Score
+     ↓
+Known Person / Unknown Person
+```
 
-A similarity score is calculated and compared with the configured recognition threshold.
-
-The current recognition threshold is:
+The configured recognition threshold is:
 
 ```text
 0.60
 ```
 
-A sufficiently high similarity score is treated as a known person; otherwise, the person is classified as unknown.
+Multiple embeddings can be stored for a registered person to improve recognition across different:
 
-Multiple embeddings can be stored for a person to improve recognition across different poses and lighting conditions.
+* Facial poses
+* Lighting conditions
+* Camera distances
+* Expressions
 
 ---
 
-## 10. Motion Detection
+# 18. Motion Detection
 
-The motion detector processes consecutive frames using:
+The motion detector processes consecutive camera frames using:
 
 1. Grayscale conversion
 2. Gaussian blur
@@ -388,31 +725,51 @@ The current minimum motion contour area is:
 500 pixels
 ```
 
-When motion is detected, SENTRIX starts recording.
+When sufficient motion is detected:
 
-The system continues recording for a configured period after the last detected motion.
+```text
+Motion Detected
+      ↓
+Event Logged
+      ↓
+Recording Started
+      ↓
+Motion Continues
+      ↓
+Recording Continues
+      ↓
+No Motion
+      ↓
+Post-Motion Period
+      ↓
+Recording Stopped
+```
+
+The current post-motion recording period is:
+
+```text
+10 seconds
+```
 
 ---
 
-## 11. Tamper Detection
+# 19. Tamper Detection
 
-The camera tamper system monitors three main image characteristics:
+SENTRIX uses multiple image-analysis techniques to monitor camera integrity.
 
-### Brightness
+## Brightness Analysis
 
-Used to identify conditions such as a covered or obstructed lens.
+Brightness information can help identify a covered or obstructed lens.
 
-### Blur Variance
+## Blur Analysis
 
-A low variance of the Laplacian indicates that the image may have become significantly blurred.
+Blur variance is used to detect significant loss of image sharpness.
 
-### Histogram Correlation
+## Histogram Comparison
 
-Compares the current frame with a reference frame to identify significant visual changes that may indicate camera movement.
+Histogram correlation is used to compare the current camera view with a reference view and identify significant visual changes.
 
-Tamper detection also uses multiple consecutive frames to reduce false alarms caused by normal movement.
-
-Possible statuses include:
+Possible conditions include:
 
 ```text
 CAMERA OK
@@ -421,63 +778,89 @@ CAMERA BLURRED
 CAMERA MOVED
 ```
 
+Tamper information is stored in the SQLite database and can be included in the daily PDF report.
+
 ---
 
-## 12. Database
+# 20. Database
 
-SENTRIX uses SQLite to store structured security information.
+SENTRIX uses SQLite for structured security data storage.
 
-Database file:
+Database location:
 
 ```text
 data/sentrix.db
 ```
 
-The database contains information related to:
+The database stores information related to:
 
 * Registered persons
 * Security events
-* Recordings
-* Tamper events
+* Video recordings
+* Camera tamper events
 
-The database is created automatically when SENTRIX starts.
+The database is initialized automatically when SENTRIX starts.
 
----
-
-## 13. Recordings
-
-Motion-triggered recordings are stored in:
-
-```text
-recordings/
-```
-
-Each recording contains a timestamp in its filename.
-
-Example:
-
-```text
-SENTRIX_20260915_220647.mp4
-```
-
-Very short recordings are ignored by the database system to prevent meaningless entries.
+The database also allows the reporting system to reconstruct historical security activity.
 
 ---
 
-## 14. PDF Reports
+# 21. Database and Physical Storage Relationship
 
-Daily reports can be generated from the SENTRIX dashboard.
+SENTRIX separates security records from physical video storage.
 
-Reports contain security information such as:
+```text
+              SENTRIX
+                 │
+        ┌────────┴────────┐
+        │                 │
+        ▼                 ▼
+   SQLite Database     Video Files
+        │                 │
+        │                 │
+        ▼                 ▼
+ Historical Records   recordings/
+```
 
-* Report date
-* Security events
-* Motion activity
-* Unknown-person detections
-* Tamper events
-* Recording information
+The database retains information about recordings even after old physical video files are removed by the 15-day retention mechanism.
 
-Generated reports are stored in:
+This allows historical security reports to retain information about past recording events.
+
+---
+
+# 22. PDF Report Generation Flow
+
+The report generation process follows this workflow:
+
+```text
+Dashboard
+    ↓
+Select Report Date
+    ↓
+Retrieve Database Events
+    ↓
+Retrieve Recording Records
+    ↓
+Retrieve Tamper Records
+    ↓
+Filter Selected Date
+    ↓
+Analyze Security Activity
+    ↓
+Generate ReportLab PDF
+    ↓
+Save PDF
+    ↓
+reports/SENTRIX_Report_DATE.pdf
+```
+
+The report generator is located at:
+
+```text
+app/report/generator.py
+```
+
+Generated reports are stored at:
 
 ```text
 reports/
@@ -485,30 +868,90 @@ reports/
 
 ---
 
-## 15. Team Responsibilities
+# 23. Security Status
 
-### Member 1 — Motion Detection & Video Capture
+The daily report determines a descriptive security state based on the recorded events.
 
-Responsible for:
+Possible states include:
+
+```text
+NORMAL MONITORING
+```
+
+when no unknown-person or tamper events are recorded.
+
+```text
+UNKNOWN ACTIVITY DETECTED
+```
+
+when unknown-person events are recorded.
+
+```text
+ATTENTION REQUIRED
+```
+
+when camera tamper events are recorded.
+
+These states summarize recorded system activity and do not claim that an actual security incident occurred beyond what SENTRIX detected.
+
+---
+
+# 24. Demonstration Workflow
+
+For a project demonstration:
+
+1. Start the SENTRIX application.
+2. Open the dashboard on the laptop.
+3. Connect a smartphone to the same Wi-Fi network.
+4. Open the laptop IP address on the smartphone.
+5. Show the live camera feed.
+6. Walk in front of the camera.
+7. Demonstrate motion detection.
+8. Show automatic video recording.
+9. Demonstrate recognition of a registered person.
+10. Demonstrate unknown-person detection.
+11. Cover the camera to demonstrate tamper detection.
+12. Demonstrate camera movement if required.
+13. Show security events in the dashboard.
+14. Open an available recording.
+15. Demonstrate voice alerts.
+16. Generate the daily PDF security report.
+17. Show the chronological security timeline in the report.
+18. Demonstrate the dashboard from the smartphone.
+
+---
+
+# 25. Team Responsibilities
+
+## Member 1 — Motion Detection & Video Capture
+
+Responsibilities include:
 
 * Camera capture
 * Motion detection
 * Video recording
 * Motion-triggered recording logic
+* Recording retention integration
 
-### Member 2 — Face Recognition
+---
 
-Responsible for:
+## Member 2 — Face Recognition
 
-* Face dataset
+Responsibilities include:
+
+* Face dataset preparation
 * Face registration
 * Face detection
 * Face embeddings
 * Face recognition
+* Registered-person identification
+* Unknown-person detection
 
-### Member 3 — Dashboard & Integration
+---
 
-Responsible for:
+## Member 3 — Dashboard & Integration
+
+Responsibilities include:
 
 * Web dashboard
 * System integration
@@ -516,16 +959,18 @@ Responsible for:
 * Event display
 * System status display
 * User interface
-
-The final system integrates all three components into a single SENTRIX application.
+* Report-generation integration
+* Voice-alert interface
 
 ---
 
-## 16. Privacy and Security
+# 26. Privacy and Security
 
-Face images and face embeddings are biometric information and should not be publicly uploaded.
+SENTRIX processes facial information, therefore privacy should be considered during development and demonstration.
 
-The following directories are intentionally excluded from GitHub:
+Face images and face embeddings should not be publicly uploaded.
+
+The following directories contain potentially sensitive project data:
 
 ```text
 face_dataset/
@@ -533,58 +978,138 @@ registered_faces/
 recordings/
 ```
 
-Database files and generated report files are also excluded where appropriate.
+These directories should be excluded from public Git repositories where appropriate.
 
-When sharing the project with teammates, these files may be shared privately when required for the project demonstration.
+Database files and generated reports may also contain security-related information and should be handled carefully.
 
----
-
-## 17. Demonstration Workflow
-
-For a project demonstration:
-
-1. Start the SENTRIX application.
-2. Open the dashboard on the laptop.
-3. Connect the phone to the same Wi-Fi network.
-4. Open the laptop's IP address on the phone.
-5. Show the live camera feed.
-6. Walk in front of the camera to trigger motion detection.
-7. Show automatic video recording.
-8. Show a registered person's recognition.
-9. Show an unknown-person detection.
-10. Cover the camera to demonstrate tamper detection.
-11. Show the event history.
-12. Show the recorded video.
-13. Generate a daily PDF security report.
-14. Demonstrate the dashboard from the phone.
+When sharing the project with teammates, sensitive files should be transferred through appropriate private methods.
 
 ---
 
-## 18. Important Notes
+# 27. Recommended `.gitignore`
+
+Sensitive and generated data should generally be excluded from GitHub.
+
+Example:
+
+```gitignore
+venv/
+__pycache__/
+*.pyc
+
+face_dataset/
+registered_faces/
+recordings/
+
+data/*.db
+reports/*.pdf
+
+.env
+```
+
+---
+
+# 28. Important Notes
 
 * The laptop camera must be available before starting SENTRIX.
-* The phone and laptop should be connected to the same local network for mobile dashboard access.
 * Camera permissions must be enabled.
-* Face recognition performance depends on lighting, camera quality, face position, and registration quality.
-* Voice alerts depend on browser/device speech-synthesis support.
+* Only one application should normally use the camera at a time.
+* The phone and laptop should be connected to the same local network for mobile dashboard access.
+* The laptop's firewall/network configuration may affect mobile access.
+* Face recognition performance depends on lighting, camera quality, face position, distance, and registration quality.
+* Voice alerts depend on browser and device support for the Web Speech API.
+* Physical recordings are subject to the configured 15-day retention period.
+* Database recording information is retained even when an old physical recording file is removed.
+* Deleted physical recordings cannot be replayed unless a separate backup exists.
 * Do not publicly upload face datasets or face embeddings.
+* SENTRIX is an academic prototype and should not be treated as a replacement for professionally certified security systems.
 
 ---
 
-## 19. Project Status
+# 29. Project Status
 
 SENTRIX Phase 1 includes:
 
 * Real-time camera monitoring
 * Motion detection
-* Motion-triggered recording
+* Motion-triggered video recording
 * Facial recognition
+* Registered-person recognition
 * Unknown-person detection
 * Camera tamper detection
 * SQLite event storage
+* SQLite recording storage
 * Web dashboard
 * Mobile dashboard access
-* Voice alerts
+* Browser-based voice alerts
 * Automated PDF security reports
+* Chronological security timeline
+* Daily security activity reconstruction
+* Camera integrity reporting
+* 15-day physical recording retention
 
-The system is designed as an integrated AIoT smart surveillance prototype for academic demonstration and further development.
+The system integrates computer vision, artificial intelligence, web technologies, database management, and automated reporting into a single AIoT-based smart surveillance prototype.
+
+SENTRIX is designed for **academic demonstration, security-system prototyping, and future development**.
+
+---
+
+# 30. Future Development
+
+Potential future improvements include:
+
+* Cloud-based secure storage
+* Remote notifications
+* Improved multi-camera support
+* Advanced person tracking
+* Improved tamper classification
+* Secure user authentication
+* Encrypted storage
+* Remote report access
+* Improved mobile interface
+* Advanced event correlation
+* Backup of important recordings
+* Configurable recording-retention policies
+* More advanced security analytics
+
+These features are potential future extensions and are not necessarily part of the current Phase 1 implementation.
+
+---
+
+# 31. Project Summary
+
+SENTRIX combines multiple security technologies into one integrated system:
+
+```text
+             ┌─────────────────────┐
+             │     SENTRIX         │
+             │ Smart Surveillance  │
+             └──────────┬──────────┘
+                        │
+       ┌────────────────┼────────────────┐
+       │                │                │
+       ▼                ▼                ▼
+   Motion           Face             Tamper
+ Detection       Recognition       Detection
+       │                │                │
+       └────────────────┼────────────────┘
+                        │
+                        ▼
+                Security Events
+                        │
+             ┌──────────┼──────────┐
+             │          │          │
+             ▼          ▼          ▼
+          Video      SQLite       PDF
+        Recording   Database     Reports
+             │          │          │
+             └──────────┼──────────┘
+                        │
+                        ▼
+                 Web Dashboard
+                        │
+                        ▼
+                  Mobile Access
+```
+
+**SENTRIX provides a unified AIoT-based surveillance prototype capable of detecting, recording, recognizing, logging, reporting, and presenting security events through a web-based monitoring platform.**

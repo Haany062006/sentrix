@@ -14,7 +14,8 @@ from app.tamper.detector import TamperDetector
 from app.database.db import (
     add_event as add_database_event,
     add_recording,
-    add_tamper_event
+    add_tamper_event,
+    cleanup_old_recording_files
 )
 
 from app.dashboard.dashboard import (
@@ -270,7 +271,7 @@ def run_sentrix():
     print(
         "Opening camera..."
     )
-
+    cleanup_old_recording_files(days=15)
     camera = cv2.VideoCapture(
         0,
         cv2.CAP_MSMF
@@ -717,27 +718,14 @@ def run_sentrix():
                 if tamper_detected:
 
                     log_event(
-                        (
-                            f"Tamper detected: "
-                            f"{current_tamper_status}"
-                        ),
-                        (
-                            f"tamper_"
-                            f"{current_tamper_status}"
-                        ),
-                        tamper_type=(
-                            current_tamper_status
-                        ),
-                        brightness=(
-                            tamper_brightness
-                        ),
-                        blur_variance=(
-                            tamper_blur_variance
-                        ),
-                        histogram_correlation=(
-                            tamper_histogram_correlation
-                        )
+                        f"Tamper detected: {current_tamper_status}",
+                        event_key=f"tamper_{current_tamper_status}",
+                        tamper_type=current_tamper_status,
+                        brightness=tamper_brightness,
+                        blur_variance=tamper_blur_variance,
+                        histogram_correlation=tamper_histogram_correlation
                     )
+                        
 
             except Exception as e:
 
