@@ -265,12 +265,13 @@ def api_recordings():
 
         files.append({
             "name": filename,
-            "size": os.path.getsize(filepath)
+            "size": os.path.getsize(filepath),
+            "timestamp": os.path.getmtime(filepath)
         })
 
     # Newest first
     files.sort(
-        key=lambda x: x["name"],
+        key=lambda x: x["timestamp"],
         reverse=True
     )
 

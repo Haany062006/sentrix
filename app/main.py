@@ -31,6 +31,8 @@ from app.dashboard.dashboard import (
 # ============================================================
 
 POST_MOTION_SECONDS = 10
+MOTION_CONFIRMATION_SECONDS = 1.0
+MIN_RECORDING_SECONDS = 5.0
 EVENT_COOLDOWN = 5
 OUTPUT_FOLDER = "recordings"
 
@@ -495,6 +497,9 @@ def run_sentrix():
 
     recording_start_time = None
 
+    # Motion must remain detected for this long before recording starts.
+    motion_candidate_start_time = None
+
     # ========================================================
     # CURRENT TAMPER STATUS
     # ========================================================
@@ -639,10 +644,23 @@ def run_sentrix():
 
             last_motion_time = time.time()
 
+            # Do not start a recording from a single brief motion detection.
+            # Motion must remain detected for MOTION_CONFIRMATION_SECONDS.
+            if not recording:
+
+                if motion_candidate_start_time is None:
+
+                    motion_candidate_start_time = time.time()
+
             log_event(
                 "Motion detected",
                 "motion"
             )
+
+        elif not recording:
+
+            # Brief motion disappeared before confirmation.
+            motion_candidate_start_time = None
 
         # ====================================================
         # TAMPER DETECTION
@@ -1009,10 +1027,21 @@ def run_sentrix():
         # START RECORDING
         # ====================================================
 
-        if (
+        motion_confirmed = (
             motion_detected
             and not recording
-        ):
+            and motion_candidate_start_time is not None
+            and (
+                time.time()
+                - motion_candidate_start_time
+                >= MOTION_CONFIRMATION_SECONDS
+            )
+        )
+
+        if motion_confirmed:
+
+            # Reset the candidate because recording is now starting.
+            motion_candidate_start_time = None
 
             timestamp = (
                 datetime.now().strftime(
@@ -1157,12 +1186,12 @@ def run_sentrix():
                 )
 
                 # --------------------------------------------
-                # SAVE USEFUL RECORDING
+                # SAVE USEFUL RECORDING (minimum 5 seconds)
                 # --------------------------------------------
 
                 if (
                     current_recording_path is not None
-                    and recording_duration >= 2.0
+                    and recording_duration >= MIN_RECORDING_SECONDS
                     and os.path.exists(
                         current_recording_path
                     )
@@ -1377,12 +1406,12 @@ def run_sentrix():
             )
 
         # ----------------------------------------------------
-        # SAVE ACTIVE RECORDING IF USEFUL
+        # SAVE ACTIVE RECORDING IF USEFUL (minimum 5 seconds)
         # ----------------------------------------------------
 
         if (
             current_recording_path is not None
-            and recording_duration >= 2.0
+            and recording_duration >= MIN_RECORDING_SECONDS
             and os.path.exists(
                 current_recording_path
             )

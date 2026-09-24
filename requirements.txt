@@ -2,15 +2,12 @@ Flask
 numpy
 opencv-python
 Pillow
-
 tensorflow
 keras
 keras-facenet
 scipy
-
 reportlab
-
+matplotlib
 requests
 pyttsx3
-
 python-dateutil

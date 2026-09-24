@@ -229,42 +229,6 @@
             color: #ffbf45;
         }
 
-        /* RECORDINGS */
-
-        .recordings {
-            margin-top: 20px;
-        }
-
-        .recording {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 14px;
-            margin-bottom: 10px;
-            background: #18212b;
-            border-radius: 8px;
-            gap: 15px;
-        }
-
-        .recording-name {
-            word-break: break-all;
-        }
-
-        .watch-button {
-            background: #273646;
-            color: white;
-            text-decoration: none;
-            padding: 8px 14px;
-            border-radius: 6px;
-            white-space: nowrap;
-            border: none;
-            cursor: pointer;
-        }
-
-        .watch-button:hover {
-            background: #34495e;
-        }
-
         /* REPORT */
 
         .report-card {
@@ -322,10 +286,99 @@
             min-height: 20px;
         }
 
+        /* EVENTS / RECORDINGS SEPARATE VIEWS */
+
+        .separate-view {
+            display: none;
+            margin-top: 20px;
+        }
+
+        .separate-view.active {
+            display: block;
+        }
+
+        .view-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 15px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+
+        .view-header h2 {
+            margin: 0;
+        }
+
+        .back-button {
+            background: #273646;
+            color: white;
+            border: none;
+            padding: 10px 16px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+
+        .back-button:hover {
+            background: #34495e;
+        }
+
+        /* RECORDINGS */
+
+        .recordings-list {
+            margin-top: 5px;
+        }
+
+        .recording-hour-group {
+            margin-bottom: 18px;
+        }
+
+        .recording-hour {
+            margin: 0 0 10px;
+            padding: 10px 14px;
+            background: #18212b;
+            border-left: 4px solid #34495e;
+            border-radius: 8px;
+            font-size: 15px;
+            font-weight: bold;
+            color: #d7dce2;
+        }
+
+        .recording {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 14px;
+            margin-bottom: 10px;
+            background: #18212b;
+            border-radius: 8px;
+            gap: 15px;
+        }
+
+        .recording-name {
+            word-break: break-all;
+        }
+
+        .watch-button {
+            background: #273646;
+            color: white;
+            text-decoration: none;
+            padding: 8px 14px;
+            border-radius: 6px;
+            white-space: nowrap;
+            border: none;
+            cursor: pointer;
+        }
+
+        .watch-button:hover {
+            background: #34495e;
+        }
+
         /* EVENTS */
 
-        .events {
-            margin-top: 20px;
+        .events-list {
+            margin-top: 5px;
         }
 
         .event {
@@ -338,7 +391,6 @@
             color: #77838f;
             padding: 15px 0;
         }
-
 
         /* SECURITY ALERT */
 
@@ -410,6 +462,46 @@
             background: #202c38;
         }
 
+        /* DASHBOARD QUICK LINKS */
+
+        .dashboard-links {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            margin-top: 20px;
+        }
+
+        .quick-link {
+            background: #111820;
+            border: 1px solid #26313c;
+            border-radius: 12px;
+            padding: 20px;
+        }
+
+        .quick-link h2 {
+            margin-top: 0;
+            font-size: 18px;
+        }
+
+        .quick-link p {
+            color: #9ba7b3;
+            margin-bottom: 15px;
+        }
+
+        .quick-link-button {
+            background: #273646;
+            color: white;
+            border: none;
+            padding: 10px 16px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+
+        .quick-link-button:hover {
+            background: #34495e;
+        }
+
         /* RESPONSIVE */
 
         @media (max-width: 900px) {
@@ -417,6 +509,10 @@
             .top-grid {
                 grid-template-columns: 1fr;
                 gap: 15px;
+            }
+
+            .dashboard-links {
+                grid-template-columns: 1fr;
             }
 
             .container {
@@ -455,6 +551,28 @@
 
         }
 
+        @media (max-width: 600px) {
+
+            .recording {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+
+            .watch-button {
+                width: 100%;
+                text-align: center;
+            }
+
+            .view-header {
+                align-items: flex-start;
+            }
+
+            .back-button {
+                width: 100%;
+            }
+
+        }
+
     </style>
 
 </head>
@@ -472,6 +590,7 @@
         aria-live="assertive"
         aria-atomic="true"
     >
+
         <button
             class="security-popup-close"
             type="button"
@@ -492,6 +611,7 @@
         <div id="securityPopupTime" class="security-popup-time">
             Just now
         </div>
+
     </div>
 
 
@@ -512,31 +632,88 @@
     <div class="container">
 
 
-        <!-- MAIN MONITORING AREA -->
+        <!-- ================================================= -->
+        <!-- MAIN DASHBOARD -->
+        <!-- ================================================= -->
 
-        <div class="top-grid">
+        <div id="mainDashboard">
 
-            <!-- LEFT: ALERT + CAMERA + VOICE -->
 
-            <div class="left-column">
+            <!-- MAIN MONITORING AREA -->
 
-<!-- LIVE CAMERA -->
+            <div class="top-grid">
 
-                <div class="card camera-card">
 
-                    <h2>📷 Live Camera</h2>
+                <!-- LEFT: CAMERA + VOICE -->
 
-                    <div class="live-camera-wrap">
+                <div class="left-column">
 
-                        <img
-                            id="liveCamera"
-                            class="live-camera"
-                            src="/video_feed"
-                            alt="SENTRIX Live Camera"
-                        >
 
-                        <div id="cameraHelp" class="camera-help">
-                            Camera stream is not available. Check that SENTRIX is running and the camera is active.
+                    <!-- LIVE CAMERA -->
+
+                    <div class="card camera-card">
+
+                        <h2>📷 Live Camera</h2>
+
+                        <div class="live-camera-wrap">
+
+                            <img
+                                id="liveCamera"
+                                class="live-camera"
+                                src="/video_feed"
+                                alt="SENTRIX Live Camera"
+                            >
+
+                            <div
+                                id="cameraHelp"
+                                class="camera-help"
+                            >
+                                Camera stream is not available.
+                                Check that SENTRIX is running and
+                                the camera is active.
+                            </div>
+
+                        </div>
+
+                    </div>
+
+
+                    <!-- VOICE MONITOR -->
+
+                    <div class="card voice-monitor">
+
+                        <div>
+
+                            <strong>
+                                🔊 Voice Monitor
+                            </strong>
+
+                            <div
+                                id="voiceStatus"
+                                class="voice-status"
+                            >
+                                Voice disabled — tap Enable Voice
+                            </div>
+
+                        </div>
+
+                        <div>
+
+                            <button
+                                id="voiceButton"
+                                class="voice-button"
+                                onclick="toggleVoice()"
+                            >
+                                Enable Voice
+                            </button>
+
+                            <button
+                                class="voice-button"
+                                onclick="testVoice()"
+                            >
+                                🔊 Test Voice
+                            </button>
+
                         </div>
 
                     </div>
@@ -544,33 +721,111 @@
                 </div>
 
 
-                <!-- VOICE MONITOR -->
+                <!-- RIGHT: SYSTEM STATUS -->
 
-                <div class="card voice-monitor">
+                <div class="card">
 
-                    <div>
-                        <strong>🔊 Voice Monitor</strong>
+                    <h2>System Status</h2>
 
-                        <div id="voiceStatus" class="voice-status">
-                            Voice disabled — tap Enable Voice
+                    <div class="status-grid">
+
+
+                        <div class="status-item">
+
+                            <span class="status-name">
+                                Camera
+                            </span>
+
+                            <span
+                                id="cameraStatus"
+                                class="status-value"
+                            >
+                                STARTING
+                            </span>
+
                         </div>
-                    </div>
 
-                    <div>
-                        <button
-                            id="voiceButton"
-                            class="voice-button"
-                            onclick="toggleVoice()"
-                        >
-                            Enable Voice
-                        </button>
 
-                        <button
-                            class="voice-button"
-                            onclick="testVoice()"
-                        >
-                            🔊 Test Voice
-                        </button>
+                        <div class="status-item">
+
+                            <span class="status-name">
+                                Motion
+                            </span>
+
+                            <span
+                                id="motionStatus"
+                                class="status-value"
+                            >
+                                CLEAR
+                            </span>
+
+                        </div>
+
+
+                        <div class="status-item">
+
+                            <span class="status-name">
+                                Face
+                            </span>
+
+                            <span
+                                id="faceStatus"
+                                class="status-value"
+                            >
+                                NONE
+                            </span>
+
+                        </div>
+
+
+                        <div class="status-item">
+
+                            <span class="status-name">
+                                Person
+                            </span>
+
+                            <span
+                                id="personStatus"
+                                class="status-value"
+                            >
+                                NONE
+                            </span>
+
+                        </div>
+
+
+                        <div class="status-item">
+
+                            <span class="status-name">
+                                Tamper
+                            </span>
+
+                            <span
+                                id="tamperStatus"
+                                class="status-value"
+                            >
+                                CAMERA OK
+                            </span>
+
+                        </div>
+
+
+                        <div class="status-item">
+
+                            <span class="status-name">
+                                Recording
+                            </span>
+
+                            <span
+                                id="recordingStatus"
+                                class="status-value"
+                            >
+                                NO
+                            </span>
+
+                        </div>
+
+
                     </div>
 
                 </div>
@@ -578,101 +833,137 @@
             </div>
 
 
-            <!-- RIGHT: SYSTEM STATUS -->
+
+            <!-- DAILY SECURITY REPORT -->
+
+            <div class="card report-card">
+
+                <h2>📄 Daily Security Report</h2>
+
+                <p class="report-description">
+
+                    Select a date and generate a security report
+                    containing the day's security activity.
+
+                </p>
+
+
+                <div class="report-controls">
+
+                    <input
+                        type="date"
+                        id="reportDate"
+                        class="report-date"
+                    >
+
+                    <button
+                        id="generateReportButton"
+                        class="report-button"
+                        onclick="generateReport()"
+                    >
+                        Generate Report
+                    </button>
+
+                </div>
+
+
+                <div
+                    id="reportMessage"
+                    class="report-message"
+                ></div>
+
+            </div>
+
+
+
+            <!-- ONLY TWO NEW DASHBOARD SECTIONS -->
+
+            <div class="dashboard-links">
+
+
+                <!-- RECORDINGS LINK -->
+
+                <div class="quick-link">
+
+                    <h2>🎥 Recordings</h2>
+
+                    <p>
+                        View and download all SENTRIX security
+                        recordings.
+                    </p>
+
+                    <button
+                        class="quick-link-button"
+                        onclick="showView('recordings')"
+                    >
+                        View Recordings
+                    </button>
+
+                </div>
+
+
+                <!-- EVENTS LINK -->
+
+                <div class="quick-link">
+
+                    <h2>📋 Recent Events</h2>
+
+                    <p>
+                        View the complete SENTRIX security
+                        event history.
+                    </p>
+
+                    <button
+                        class="quick-link-button"
+                        onclick="showView('events')"
+                    >
+                        View Events
+                    </button>
+
+                </div>
+
+
+            </div>
+
+
+        </div>
+
+
+
+        <!-- ================================================= -->
+        <!-- RECORDINGS VIEW -->
+        <!-- ================================================= -->
+
+        <div
+            id="recordingsView"
+            class="separate-view"
+        >
 
             <div class="card">
 
-                <h2>System Status</h2>
+                <div class="view-header">
 
-                <div class="status-grid">
+                    <h2>
+                        🎥 SENTRIX Recordings
+                    </h2>
 
-                    <div class="status-item">
+                    <button
+                        class="back-button"
+                        onclick="showView('dashboard')"
+                    >
+                        ← Back to Dashboard
+                    </button>
 
-                        <span class="status-name">
-                            Camera
-                        </span>
-
-                        <span
-                            id="cameraStatus"
-                            class="status-value">
-                            STARTING
-                        </span>
-
-                    </div>
+                </div>
 
 
-                    <div class="status-item">
+                <div
+                    id="recordingsList"
+                    class="recordings-list"
+                >
 
-                        <span class="status-name">
-                            Motion
-                        </span>
-
-                        <span
-                            id="motionStatus"
-                            class="status-value">
-                            CLEAR
-                        </span>
-
-                    </div>
-
-
-                    <div class="status-item">
-
-                        <span class="status-name">
-                            Face
-                        </span>
-
-                        <span
-                            id="faceStatus"
-                            class="status-value">
-                            NONE
-                        </span>
-
-                    </div>
-
-
-                    <div class="status-item">
-
-                        <span class="status-name">
-                            Person
-                        </span>
-
-                        <span
-                            id="personStatus"
-                            class="status-value">
-                            NONE
-                        </span>
-
-                    </div>
-
-
-                    <div class="status-item">
-
-                        <span class="status-name">
-                            Tamper
-                        </span>
-
-                        <span
-                            id="tamperStatus"
-                            class="status-value">
-                            CAMERA OK
-                        </span>
-
-                    </div>
-
-
-                    <div class="status-item">
-
-                        <span class="status-name">
-                            Recording
-                        </span>
-
-                        <span
-                            id="recordingStatus"
-                            class="status-value">
-                            NO
-                        </span>
-
+                    <div class="empty">
+                        No recordings yet.
                     </div>
 
                 </div>
@@ -682,74 +973,43 @@
         </div>
 
 
-        <!-- RECORDINGS -->
 
-        <div class="card recordings">
+        <!-- ================================================= -->
+        <!-- EVENTS VIEW -->
+        <!-- ================================================= -->
 
-            <h2>🎥 Recordings</h2>
+        <div
+            id="eventsView"
+            class="separate-view"
+        >
 
-            <div id="recordingsList">
+            <div class="card">
 
-                <div class="empty">
-                    No recordings yet.
+                <div class="view-header">
+
+                    <h2>
+                        📋 SENTRIX Recent Events
+                    </h2>
+
+                    <button
+                        class="back-button"
+                        onclick="showView('dashboard')"
+                    >
+                        ← Back to Dashboard
+                    </button>
+
                 </div>
 
-            </div>
 
-        </div>
-
-
-        <!-- DAILY SECURITY REPORT -->
-
-        <div class="card report-card">
-
-            <h2>📄 Daily Security Report</h2>
-
-            <p class="report-description">
-
-                Select a date and generate a security report
-                containing the day's security activity.
-
-            </p>
-
-
-            <div class="report-controls">
-
-                <input
-                    type="date"
-                    id="reportDate"
-                    class="report-date"
+                <div
+                    id="eventsList"
+                    class="events-list"
                 >
 
-                <button
-                    id="generateReportButton"
-                    class="report-button"
-                    onclick="generateReport()"
-                >
-                    Generate Report
-                </button>
+                    <div class="empty">
+                        No events yet.
+                    </div>
 
-            </div>
-
-
-            <div
-                id="reportMessage"
-                class="report-message"
-            ></div>
-
-        </div>
-
-
-        <!-- RECENT EVENTS -->
-
-        <div class="card events">
-
-            <h2>📋 Recent Events</h2>
-
-            <div id="eventsList">
-
-                <div class="empty">
-                    No events yet.
                 </div>
 
             </div>
@@ -760,7 +1020,68 @@
     </div>
 
 
+
     <script>
+
+
+        /* =================================
+           VIEW SWITCHING
+        ================================= */
+
+        function showView(view) {
+
+            const dashboard =
+                document.getElementById(
+                    "mainDashboard"
+                );
+
+            const recordings =
+                document.getElementById(
+                    "recordingsView"
+                );
+
+            const events =
+                document.getElementById(
+                    "eventsView"
+                );
+
+
+            dashboard.style.display = "none";
+
+            recordings.classList.remove("active");
+
+            events.classList.remove("active");
+
+
+            if (view === "recordings") {
+
+                recordings.classList.add("active");
+
+                updateRecordings();
+
+            }
+
+            else if (view === "events") {
+
+                events.classList.add("active");
+
+                updateEvents();
+
+            }
+
+            else {
+
+                dashboard.style.display = "block";
+
+            }
+
+            window.scrollTo({
+                top: 0,
+                behavior: "smooth"
+            });
+
+        }
+
 
 
         /* =================================
@@ -929,186 +1250,376 @@
         }
 
 
+
         /* =================================
            CRITICAL ALERT + VOICE MONITOR
         ================================= */
 
         let voiceEnabled = false;
+
         let lastCriticalEvent = "";
+
         let eventsInitialized = false;
+
         let popupTimer = null;
 
         let voiceQueue = [];
+
         let isSpeaking = false;
+
         const ALERT_COOLDOWN = 6000;
+
         const lastAlertTime = {};
 
+
         function canAlert(eventType) {
-            const now = Date.now();
+
+            const now =
+                Date.now();
 
             if (
                 lastAlertTime[eventType] &&
-                now - lastAlertTime[eventType] < ALERT_COOLDOWN
+                now - lastAlertTime[eventType]
+                < ALERT_COOLDOWN
             ) {
+
                 return false;
+
             }
 
-            lastAlertTime[eventType] = now;
+            lastAlertTime[eventType] =
+                now;
+
             return true;
+
         }
 
-    function speakAlert(text) {
-        if (!voiceEnabled || !text) return;
 
-        // Add the new alert to the queue
-        voiceQueue.push(text);
+        function speakAlert(text) {
 
-        // Start speaking if nothing is currently being spoken
-        processVoiceQueue();
-    }
+            if (!voiceEnabled || !text) {
+                return;
+            }
 
-    function processVoiceQueue() {
-        if (isSpeaking || voiceQueue.length === 0 || !voiceEnabled) {
-            return;
-        }
+            voiceQueue.push(text);
 
-        const text = voiceQueue.shift();
-
-        const utterance = new SpeechSynthesisUtterance(text);
-
-        utterance.rate = 0.9;
-        utterance.pitch = 1.0;
-        utterance.volume = 1.0;
-
-        isSpeaking = true;
-
-        utterance.onend = function () {
-            isSpeaking = false;
-
-            // Wait a tiny moment before the next alert
-            setTimeout(() => {
-                processVoiceQueue();
-            }, 200);
-        };
-
-        utterance.onerror = function () {
-            isSpeaking = false;
             processVoiceQueue();
-        };
 
-        window.speechSynthesis.speak(utterance);
-}
-       function stopVoiceAlerts() {
-            voiceQueue = [];
-            isSpeaking = false;
-            window.speechSynthesis.cancel();
         }
-        
+
+
+        function processVoiceQueue() {
+
+            if (
+                isSpeaking ||
+                voiceQueue.length === 0 ||
+                !voiceEnabled
+            ) {
+
+                return;
+
+            }
+
+            const text =
+                voiceQueue.shift();
+
+            const utterance =
+                new SpeechSynthesisUtterance(
+                    text
+                );
+
+            utterance.rate = 0.9;
+            utterance.pitch = 1.0;
+            utterance.volume = 1.0;
+
+            isSpeaking = true;
+
+
+            utterance.onend =
+                function () {
+
+                    isSpeaking = false;
+
+                    setTimeout(
+                        () => {
+                            processVoiceQueue();
+                        },
+                        200
+                    );
+
+                };
+
+
+            utterance.onerror =
+                function () {
+
+                    isSpeaking = false;
+
+                    processVoiceQueue();
+
+                };
+
+
+            window.speechSynthesis.speak(
+                utterance
+            );
+
+        }
+
+
+        function stopVoiceAlerts() {
+
+            voiceQueue = [];
+
+            isSpeaking = false;
+
+            window.speechSynthesis.cancel();
+
+        }
+
+
 
         function getCriticalAlert(eventText) {
 
-            const parts = String(eventText).split(" - ");
-            const message = parts.length > 1
-                ? parts.slice(1).join(" - ")
-                : String(eventText);
-            const lower = message.toLowerCase();
-
-            if (lower.includes("unknown person detected")) {
-                return {
-                    type: "unknown",
-                    title: "🔴 SECURITY ALERT",
-                    message: "Unknown person detected",
-                    voice: "Attention. Unknown person detected."
-                };
-            }
-
-            if (lower.includes("recognized")) {
-                const match = message.match(/(.+?) recognized/i);
-                const person = match ? match[1].trim() : "Known person";
-                return {
-                    type: "known",
-                    title: "🟢 SECURITY NOTIFICATION",
-                    message: person + " recognized",
-                    voice: "Known person recognized. " + person
-                };
-            }
-
-            if (lower.includes("lens covered")) {
-                return {
-                    type: "tamper",
-                    title: "🔴 SECURITY ALERT",
-                    message: "Lens covered",
-                    voice: "Warning. Camera lens covered."
-                };
-            }
-
-            if (lower.includes("camera blurred") ||
-                lower.includes("lens blurred")) {
-                return {
-                    type: "tamper",
-                    title: "🔴 SECURITY ALERT",
-                    message: "Camera lens blurred",
-                    voice: "Warning. Camera lens is blurred."
-                };
-            }
-
-            if (lower.includes("camera moved")) {
-                return {
-                    type: "tamper",
-                    title: "🔴 SECURITY ALERT",
-                    message: "Camera moved",
-                    voice: "Warning. Camera has been moved."
-                };
-            }
-
-            if (lower.includes("tamper")) {
-                return {
-                    type: "tamper",
-                    title: "🔴 SECURITY ALERT",
-                    message: "Camera tampering detected",
-                    voice: "Warning. Camera tampering detected."
-                };
-            }
-
-            return null;
-        }
-
-        function showSecurityPopup(alert, eventText) {
-
-            const popup =
-                document.getElementById("securityPopup");
-
-            const title =
-                document.getElementById("securityPopupTitle");
-
-            const message =
-                document.getElementById("securityPopupMessage");
-
-            const time =
-                document.getElementById("securityPopupTime");
-
-            title.textContent = alert.title;
-            message.textContent = alert.message;
-
             const parts =
                 String(eventText).split(" - ");
+
+            const message =
+                parts.length > 1
+                ? parts.slice(1).join(" - ")
+                : String(eventText);
+
+            const lower =
+                message.toLowerCase();
+
+
+            if (
+                lower.includes(
+                    "unknown person detected"
+                )
+            ) {
+
+                return {
+
+                    type: "unknown",
+
+                    title:
+                        "🔴 SECURITY ALERT",
+
+                    message:
+                        "Unknown person detected",
+
+                    voice:
+                        "Attention. Unknown person detected."
+
+                };
+
+            }
+
+
+            if (
+                lower.includes("recognized")
+            ) {
+
+                const match =
+                    message.match(
+                        /(.+?) recognized/i
+                    );
+
+                const person =
+                    match
+                    ? match[1].trim()
+                    : "Known person";
+
+
+                return {
+
+                    type: "known",
+
+                    title:
+                        "🟢 SECURITY NOTIFICATION",
+
+                    message:
+                        person + " recognized",
+
+                    voice:
+                        "Known person recognized. "
+                        + person
+
+                };
+
+            }
+
+
+            if (
+                lower.includes("lens covered")
+            ) {
+
+                return {
+
+                    type: "tamper",
+
+                    title:
+                        "🔴 SECURITY ALERT",
+
+                    message:
+                        "Lens covered",
+
+                    voice:
+                        "Warning. Camera lens covered."
+
+                };
+
+            }
+
+
+            if (
+                lower.includes("camera blurred") ||
+                lower.includes("lens blurred")
+            ) {
+
+                return {
+
+                    type: "tamper",
+
+                    title:
+                        "🔴 SECURITY ALERT",
+
+                    message:
+                        "Camera lens blurred",
+
+                    voice:
+                        "Warning. Camera lens is blurred."
+
+                };
+
+            }
+
+
+            if (
+                lower.includes("camera moved")
+            ) {
+
+                return {
+
+                    type: "tamper",
+
+                    title:
+                        "🔴 SECURITY ALERT",
+
+                    message:
+                        "Camera moved",
+
+                    voice:
+                        "Warning. Camera has been moved."
+
+                };
+
+            }
+
+
+            if (
+                lower.includes("tamper")
+            ) {
+
+                return {
+
+                    type: "tamper",
+
+                    title:
+                        "🔴 SECURITY ALERT",
+
+                    message:
+                        "Camera tampering detected",
+
+                    voice:
+                        "Warning. Camera tampering detected."
+
+                };
+
+            }
+
+
+            return null;
+
+        }
+
+
+
+        function showSecurityPopup(
+            alert,
+            eventText
+        ) {
+
+            const popup =
+                document.getElementById(
+                    "securityPopup"
+                );
+
+            const title =
+                document.getElementById(
+                    "securityPopupTitle"
+                );
+
+            const message =
+                document.getElementById(
+                    "securityPopupMessage"
+                );
+
+            const time =
+                document.getElementById(
+                    "securityPopupTime"
+                );
+
+
+            title.textContent =
+                alert.title;
+
+            message.textContent =
+                alert.message;
+
+
+            const parts =
+                String(eventText).split(
+                    " - "
+                );
+
 
             time.textContent =
                 parts.length > 1
                 ? parts[0]
                 : "Just now";
 
-            popup.classList.remove("known-alert");
 
-            if (alert.type === "known") {
-                popup.classList.add("known-alert");
+            popup.classList.remove(
+                "known-alert"
+            );
+
+
+            if (
+                alert.type === "known"
+            ) {
+
+                popup.classList.add(
+                    "known-alert"
+                );
+
             }
 
-            popup.classList.add("show");
+
+            popup.classList.add(
+                "show"
+            );
+
 
             if (popupTimer) {
-                clearTimeout(popupTimer);
+
+                clearTimeout(
+                    popupTimer
+                );
+
             }
+
 
             popupTimer =
                 setTimeout(
@@ -1116,36 +1627,51 @@
                     3000
                 );
 
-            speakAlert(alert.voice);
+
+            speakAlert(
+                alert.voice
+            );
 
         }
+
 
 
         function hideSecurityPopup() {
 
             const popup =
-                document.getElementById("securityPopup");
+                document.getElementById(
+                    "securityPopup"
+                );
 
-            popup.classList.remove("show");
-            popup.classList.remove("known-alert");
+            popup.classList.remove(
+                "show"
+            );
+
+            popup.classList.remove(
+                "known-alert"
+            );
 
         }
 
 
-        function updateCriticalAlerts(events) {
 
-            if (!events || events.length === 0) {
+        function updateCriticalAlerts(
+            events
+        ) {
+
+            if (
+                !events ||
+                events.length === 0
+            ) {
+
                 return;
+
             }
+
 
             const latestEvent =
                 String(events[0]);
 
-            /*
-             * Establish the current event on first load.
-             * This prevents an old alert from popping up just
-             * because the dashboard was refreshed.
-             */
 
             if (!eventsInitialized) {
 
@@ -1159,31 +1685,63 @@
 
             }
 
-            if (latestEvent === lastCriticalEvent) {
+
+            if (
+                latestEvent ===
+                lastCriticalEvent
+            ) {
+
                 return;
+
             }
+
 
             lastCriticalEvent =
                 latestEvent;
 
+
             const alert =
-                getCriticalAlert(latestEvent);
-            if (!canAlert(alert.type + ":" + alert.message)) {
-                return;
-            }
-            if (alert) {
-                showSecurityPopup(
-                    alert,
+                getCriticalAlert(
                     latestEvent
                 );
+
+
+            if (!alert) {
+                return;
             }
+
+
+            if (
+                !canAlert(
+                    alert.type +
+                    ":" +
+                    alert.message
+                )
+            ) {
+
+                return;
+
+            }
+
+
+            showSecurityPopup(
+                alert,
+                latestEvent
+            );
 
         }
 
 
+
+        /* =================================
+           VOICE
+        ================================= */
+
         function toggleVoice() {
 
-            if (!("speechSynthesis" in window)) {
+            if (
+                !("speechSynthesis" in window)
+            ) {
 
                 alert(
                     "Speech synthesis is not supported by this browser."
@@ -1193,14 +1751,21 @@
 
             }
 
+
             voiceEnabled =
                 !voiceEnabled;
 
+
             const button =
-                document.getElementById("voiceButton");
+                document.getElementById(
+                    "voiceButton"
+                );
 
             const status =
-                document.getElementById("voiceStatus");
+                document.getElementById(
+                    "voiceStatus"
+                );
+
 
             if (voiceEnabled) {
 
@@ -1210,7 +1775,6 @@
                 status.textContent =
                     "Voice enabled — alerts will be spoken";
 
-                /* User interaction unlocks speech on many phones. */
 
                 const welcome =
                     new SpeechSynthesisUtterance(
@@ -1220,8 +1784,12 @@
                 welcome.rate = 0.9;
                 welcome.volume = 1.0;
 
+
                 window.speechSynthesis.cancel();
-                window.speechSynthesis.speak(welcome);
+
+                window.speechSynthesis.speak(
+                    welcome
+                );
 
             }
 
@@ -1233,16 +1801,19 @@
                 status.textContent =
                     "Voice disabled — tap Enable Voice";
 
-                window.speechSynthesis.cancel();
+                stopVoiceAlerts();
 
             }
 
         }
 
 
+
         function testVoice() {
 
-            if (!("speechSynthesis" in window)) {
+            if (
+                !("speechSynthesis" in window)
+            ) {
 
                 alert(
                     "Speech synthesis is NOT supported by this browser."
@@ -1251,6 +1822,7 @@
                 return;
 
             }
+
 
             const message =
                 new SpeechSynthesisUtterance(
@@ -1261,10 +1833,15 @@
             message.pitch = 1.0;
             message.volume = 1.0;
 
+
             window.speechSynthesis.cancel();
-            window.speechSynthesis.speak(message);
+
+            window.speechSynthesis.speak(
+                message
+            );
 
         }
+
 
 
         /* =================================
@@ -1276,16 +1853,35 @@
             try {
 
                 const response =
-                    await fetch("/api/events");
+                    await fetch(
+                        "/api/events"
+                    );
+
 
                 if (!response.ok) {
-                    throw new Error("Events request failed");
+
+                    throw new Error(
+                        "Events request failed"
+                    );
+
                 }
+
 
                 const events =
                     await response.json();
 
-                updateCriticalAlerts(events);
+
+                /*
+                 * Keep the existing alert/voice
+                 * functionality active even though
+                 * the event list is no longer shown
+                 * on the main dashboard.
+                 */
+
+                updateCriticalAlerts(
+                    events
+                );
+
 
                 const container =
                     document.getElementById(
@@ -1330,6 +1926,7 @@
         }
 
 
+
         /* =================================
            UPDATE RECORDINGS
         ================================= */
@@ -1349,62 +1946,110 @@
                     await response.json();
 
                 const container =
-                    document.getElementById(
-                        "recordingsList"
-                    );
+                    document.getElementById("recordingsList");
 
-
-                if (
-                    !recordings ||
-                    recordings.length === 0
-                ) {
-
+                if (!recordings || recordings.length === 0) {
                     container.innerHTML =
-                        '<div class="empty">' +
-                        'No recordings yet.' +
-                        '</div>';
-
+                        '<div class="empty">No recordings yet.</div>';
                     return;
-
                 }
 
+                /* Group recordings by the hour they were created. */
+                const groups = {};
+
+                recordings.forEach(recording => {
+
+                    const timestamp = Number(recording.timestamp);
+                    const date =
+                        Number.isFinite(timestamp) && timestamp > 0
+                        ? new Date(timestamp * 1000)
+                        : null;
+
+                    let groupKey = "unknown";
+                    let groupLabel = "Unknown Time";
+
+                    if (date) {
+
+                        const year = date.getFullYear();
+                        const month = String(date.getMonth() + 1).padStart(2, "0");
+                        const day = String(date.getDate()).padStart(2, "0");
+                        const hour = String(date.getHours()).padStart(2, "0");
+
+                        groupKey = `${year}-${month}-${day}-${hour}`;
+
+                        groupLabel =
+                            date.toLocaleDateString(undefined, {
+                                day: "2-digit",
+                                month: "short",
+                                year: "numeric"
+                            }) +
+                            " — " +
+                            date.toLocaleTimeString(undefined, {
+                                hour: "numeric",
+                                hour12: true
+                            });
+                    }
+
+                    if (!groups[groupKey]) {
+                        groups[groupKey] = {
+                            label: groupLabel,
+                            recordings: []
+                        };
+                    }
+
+                    groups[groupKey].recordings.push(recording);
+                });
+
+                const sortedGroups =
+                    Object.entries(groups)
+                    .sort((a, b) => b[0].localeCompare(a[0]));
 
                 container.innerHTML =
-                    recordings.map(
-                        recording => {
+                    sortedGroups.map(([groupKey, group]) => {
 
-                            const filename =
-                                encodeURIComponent(
-                                    recording.name
-                                );
+                        const recordingHtml =
+                            group.recordings.map(recording => {
 
-                            const size =
-                                formatFileSize(
-                                    recording.size
-                                );
+                                const filename =
+                                    encodeURIComponent(recording.name);
 
-                            return `
-                                <div class="recording">
+                                const size =
+                                    formatFileSize(recording.size);
 
-                                    <span class="recording-name">
-                                        🎥 ${recording.name}
-                                        <small style="color:#77838f;">
-                                            (${size})
-                                        </small>
-                                    </span>
+                                return `
+                                    <div class="recording">
+                                        <span class="recording-name">
+                                            🎥 ${recording.name}
+                                            <small style="color:#77838f;">
+                                                (${size})
+                                            </small>
+                                        </span>
 
-                                    <a
-                                        class="watch-button"
-                                        href="/recordings/${filename}"
-                                        download>
-                                        Download
-                                    </a>
+                                        <a
+                                            class="watch-button"
+                                            href="/recordings/${filename}"
+                                            download
+                                        >
+                                            Download
+                                        </a>
+                                    </div>
+                                `;
 
+                            }).join("");
+
+                        return `
+                            <div
+                                class="recording-hour-group"
+                                data-hour="${groupKey}"
+                            >
+                                <div class="recording-hour">
+                                    🕐 ${group.label}
                                 </div>
-                            `;
+                                ${recordingHtml}
+                            </div>
+                        `;
 
-                        }
-                    ).join("");
+                    }).join("");
 
             }
 
@@ -1426,16 +2071,29 @@
 
         function formatFileSize(bytes) {
 
-            if (!bytes || bytes <= 0) {
+            if (
+                !bytes ||
+                bytes <= 0
+            ) {
+
                 return "0 KB";
+
             }
 
+
             const units =
-                ["Bytes", "KB", "MB", "GB"];
+                [
+                    "Bytes",
+                    "KB",
+                    "MB",
+                    "GB"
+                ];
+
 
             let index = 0;
 
             let size = bytes;
+
 
             while (
                 size >= 1024 &&
@@ -1443,9 +2101,11 @@
             ) {
 
                 size /= 1024;
+
                 index++;
 
             }
+
 
             return (
                 size.toFixed(1) +
@@ -1454,6 +2114,7 @@
             );
 
         }
+
 
 
         /* =================================
@@ -1467,10 +2128,12 @@
                     "reportDate"
                 );
 
+
             const message =
                 document.getElementById(
                     "reportMessage"
                 );
+
 
             const button =
                 document.getElementById(
@@ -1514,6 +2177,7 @@
                     await fetch(
                         "/api/generate-report",
                         {
+
                             method: "POST",
 
                             headers: {
@@ -1524,6 +2188,7 @@
                             body: JSON.stringify({
                                 date: selectedDate
                             })
+
                         }
                     );
 
@@ -1569,10 +2234,6 @@
                     );
 
 
-                /*
-                 * Open the generated PDF.
-                 */
-
                 window.open(
                     reportUrl,
                     "_blank"
@@ -1587,6 +2248,7 @@
                     "Report generation error:",
                     error
                 );
+
 
                 message.textContent =
                     "Report generation failed.";
@@ -1609,6 +2271,7 @@
         }
 
 
+
         /* =================================
            SET TODAY'S DATE
         ================================= */
@@ -1622,21 +2285,32 @@
                         "reportDate"
                     );
 
+
                 const today =
                     new Date();
+
 
                 const year =
                     today.getFullYear();
 
+
                 const month =
                     String(
                         today.getMonth() + 1
-                    ).padStart(2, "0");
+                    ).padStart(
+                        2,
+                        "0"
+                    );
+
 
                 const day =
                     String(
                         today.getDate()
-                    ).padStart(2, "0");
+                    ).padStart(
+                        2,
+                        "0"
+                    );
+
 
                 dateInput.value =
                     `${year}-${month}-${day}`;
@@ -1645,15 +2319,22 @@
         );
 
 
+
         /* =================================
            CAMERA STREAM CHECK
         ================================= */
 
         const liveCamera =
-            document.getElementById("liveCamera");
+            document.getElementById(
+                "liveCamera"
+            );
+
 
         const cameraHelp =
-            document.getElementById("cameraHelp");
+            document.getElementById(
+                "cameraHelp"
+            );
+
 
         if (liveCamera) {
 
@@ -1666,6 +2347,7 @@
 
                 }
             );
+
 
             liveCamera.addEventListener(
                 "load",
@@ -1680,6 +2362,7 @@
         }
 
 
+
         /* =================================
            AUTO REFRESH
         ================================= */
@@ -1689,15 +2372,33 @@
             1000
         );
 
+
+        /*
+         * Events are still checked every second
+         * so the existing security popup and
+         * voice alerts continue working.
+         *
+         * The list itself is only visible on
+         * the separate Events view.
+         */
+
         setInterval(
             updateEvents,
             1000
         );
 
+
+        /*
+         * Recordings are refreshed every 3 seconds.
+         * They are displayed only on the separate
+         * Recordings view.
+         */
+
         setInterval(
             updateRecordings,
             3000
         );
+
 
 
         /* =================================
