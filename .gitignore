@@ -16,6 +16,9 @@ venv/
 *.log
 
 data/events/*
+data/*.png
+data/*.jpg
+data/*.jpeg
 reports/daily/*
 
 recordings/

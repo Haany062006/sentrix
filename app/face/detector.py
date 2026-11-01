@@ -3,7 +3,7 @@ from mtcnn import MTCNN
 
 
 def detect_faces():
-    camera = cv2.VideoCapture(0, cv2.CAP_MSMF)
+    camera = cv2.VideoCapture(0)
 
     if not camera.isOpened():
         print("ERROR: Could not open camera.")

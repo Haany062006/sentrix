@@ -5,293 +5,44 @@ import numpy as np
 
 from mtcnn import MTCNN
 from keras_facenet import FaceNet
-from app.database.db import add_person
 
 
-# ============================================================
-# SETTINGS
-# ============================================================
-
-DATASET_FOLDER = "face_dataset"
 REGISTERED_FOLDER = "registered_faces"
+SAMPLES_REQUIRED = 5
 
-SAMPLES_REQUIRED = 40
-
-CAMERA_INDEX = 0
-
-MIN_CONFIDENCE = 0.90
-
-MIN_FACE_WIDTH = 80
-MIN_FACE_HEIGHT = 80
-
-# Blur protection.
-# Higher value = stricter.
-MIN_BLUR_VARIANCE = 80.0
-
-# Prevent almost identical frames from being captured.
-MIN_FRAME_DIFFERENCE = 0.03
-
-# Padding around detected face.
-FACE_PADDING = 0.20
-
-
-# ============================================================
-# HELPER FUNCTIONS
-# ============================================================
-
-def calculate_blur_score(image):
-    """
-    Measures image sharpness using Laplacian variance.
-    Higher value generally means a sharper image.
-    """
-    gray = cv2.cvtColor(
-        image,
-        cv2.COLOR_BGR2GRAY
-    )
-
-    return cv2.Laplacian(
-        gray,
-        cv2.CV_64F
-    ).var()
-
-
-def calculate_frame_difference(current, previous):
-    """
-    Calculates normalized difference between two face images.
-    Returns a value between approximately 0 and 1.
-    """
-    if previous is None:
-        return 1.0
-
-    current_gray = cv2.cvtColor(
-        current,
-        cv2.COLOR_BGR2GRAY
-    )
-
-    previous_gray = cv2.cvtColor(
-        previous,
-        cv2.COLOR_BGR2GRAY
-    )
-
-    current_gray = cv2.resize(
-        current_gray,
-        (64, 64)
-    )
-
-    previous_gray = cv2.resize(
-        previous_gray,
-        (64, 64)
-    )
-
-    difference = cv2.absdiff(
-        current_gray,
-        previous_gray
-    )
-
-    return float(
-        np.mean(difference) / 255.0
-    )
-
-
-def crop_face_with_padding(
-    frame,
-    box
-):
-    """
-    Crops the detected face with a small margin.
-    """
-    x, y, width, height = box
-
-    padding_x = int(
-        width * FACE_PADDING
-    )
-
-    padding_y = int(
-        height * FACE_PADDING
-    )
-
-    x1 = max(
-        0,
-        x - padding_x
-    )
-
-    y1 = max(
-        0,
-        y - padding_y
-    )
-
-    x2 = min(
-        frame.shape[1],
-        x + width + padding_x
-    )
-
-    y2 = min(
-        frame.shape[0],
-        y + height + padding_y
-    )
-
-    face = frame[
-        y1:y2,
-        x1:x2
-    ]
-
-    if face.size == 0:
-        return None
-
-    return cv2.resize(
-        face,
-        (160, 160)
-    )
-
-
-# ============================================================
-# REGISTER PERSON
-# ============================================================
 
 def register_person():
 
-    name = input(
-        "Enter person's name: "
-    ).strip()
+    name = input("Enter person's name: ").strip()
 
     if not name:
-
-        print(
-            "ERROR: Name cannot be empty."
-        )
-
+        print("ERROR: Name cannot be empty.")
         return
 
-    # --------------------------------------------------------
-    # CREATE FOLDERS
-    # --------------------------------------------------------
-
-    person_folder = os.path.join(
-        DATASET_FOLDER,
-        name
-    )
-
-    os.makedirs(
-        person_folder,
-        exist_ok=True
-    )
-
-    os.makedirs(
-        REGISTERED_FOLDER,
-        exist_ok=True
-    )
-
-    # --------------------------------------------------------
-    # CHECK EXISTING DATASET
-    # --------------------------------------------------------
-
-    existing_images = [
-        filename
-        for filename in os.listdir(person_folder)
-        if filename.lower().endswith(
-            (".jpg", ".jpeg", ".png")
-        )
-    ]
-
-    image_count = len(existing_images)
-
-    print()
-    print("==========================================")
-    print("       SENTRIX FACE REGISTRATION")
-    print("==========================================")
-    print(f"Person       : {name}")
-    print(f"Dataset      : {person_folder}")
-    print(f"Existing     : {image_count}")
-    print(f"Required     : {SAMPLES_REQUIRED}")
-    print("==========================================")
-    print()
-
-    if image_count >= SAMPLES_REQUIRED:
-
-        print(
-            f"The dataset already contains "
-            f"{image_count} images."
-        )
-
-        answer = input(
-            "Generate embeddings from these images? (y/n): "
-        ).strip().lower()
-
-        if answer == "y":
-
-            generate_embeddings_from_dataset(
-                name,
-                person_folder
-            )
-
-        return
-
-    # --------------------------------------------------------
-    # LOAD MTCNN
-    # --------------------------------------------------------
-
-    print(
-        "Loading MTCNN..."
-    )
+    os.makedirs(REGISTERED_FOLDER, exist_ok=True)
 
     detector = MTCNN()
+    embedder = FaceNet()
 
-    # --------------------------------------------------------
-    # CAMERA
-    # --------------------------------------------------------
-
-    print(
-        "Opening camera..."
-    )
-
-    camera = cv2.VideoCapture(
-        CAMERA_INDEX,
-        cv2.CAP_MSMF
-    )
+    camera = cv2.VideoCapture(0)
 
     if not camera.isOpened():
-
-        print(
-            "ERROR: Could not open camera."
-        )
-
+        print("ERROR: Could not open camera.")
         return
 
-    print()
-    print("------------------------------------------")
-    print("STABLE CAPTURE INSTRUCTIONS")
-    print("------------------------------------------")
-    print("Only ONE person should be visible.")
-    print("Look directly at the camera first.")
-    print("Keep your face clearly visible.")
-    print("Move your head slightly between captures.")
-    print("Change angle and expression naturally.")
-    print()
-    print("GREEN = face is ready")
-    print("YELLOW = improve quality")
-    print("RED = cannot capture")
-    print()
-    print("Press SPACE to capture.")
-    print("Press Q to cancel.")
-    print("------------------------------------------")
-    print()
+    embeddings = []
 
-    previous_face = None
+    print(f"\nRegistering: {name}")
+    print(f"Look at the camera.")
+    print(f"We need {SAMPLES_REQUIRED} good face samples.")
+    print("Press Q to cancel.\n")
 
-    # --------------------------------------------------------
-    # CAPTURE LOOP
-    # --------------------------------------------------------
-
-    while image_count < SAMPLES_REQUIRED:
+    while len(embeddings) < SAMPLES_REQUIRED:
 
         success, frame = camera.read()
 
         if not success:
-
-            print(
-                "ERROR: Could not read camera frame."
-            )
-
+            print("ERROR: Could not read frame.")
             break
 
         rgb_frame = cv2.cvtColor(
@@ -299,116 +50,45 @@ def register_person():
             cv2.COLOR_BGR2RGB
         )
 
-        faces = detector.detect_faces(
-            rgb_frame
-        )
-
-        valid_face = None
-        blur_score = 0.0
-        current_face = None
-
-        # ----------------------------------------------------
-        # EXACTLY ONE FACE
-        # ----------------------------------------------------
+        faces = detector.detect_faces(rgb_frame)
 
         if len(faces) == 1:
 
             face = faces[0]
 
-            confidence = face.get(
-                "confidence",
-                0
-            )
-
             x, y, width, height = face["box"]
 
-            x = max(
-                0,
-                x
+            x = max(0, x)
+            y = max(0, y)
+
+            face_image = rgb_frame[
+                y:y + height,
+                x:x + width
+            ]
+
+            if face_image.size == 0:
+                continue
+
+            face_image = cv2.resize(
+                face_image,
+                (160, 160)
             )
 
-            y = max(
-                0,
-                y
+            face_image = np.expand_dims(
+                face_image,
+                axis=0
             )
 
-            width = max(
-                0,
-                width
+            embedding = embedder.embeddings(
+                face_image
+            )[0]
+
+            embeddings.append(embedding)
+
+            print(
+                f"Captured sample "
+                f"{len(embeddings)}/{SAMPLES_REQUIRED}"
             )
-
-            height = max(
-                0,
-                height
-            )
-
-            # -----------------------------------------------
-            # FACE QUALITY CHECK
-            # -----------------------------------------------
-
-            if (
-                confidence >= MIN_CONFIDENCE
-                and
-                width >= MIN_FACE_WIDTH
-                and
-                height >= MIN_FACE_HEIGHT
-            ):
-
-                current_face = crop_face_with_padding(
-                    frame,
-                    (
-                        x,
-                        y,
-                        width,
-                        height
-                    )
-                )
-
-                if current_face is not None:
-
-                    blur_score = calculate_blur_score(
-                        current_face
-                    )
-
-                    if blur_score >= MIN_BLUR_VARIANCE:
-
-                        valid_face = (
-                            x,
-                            y,
-                            width,
-                            height
-                        )
-
-        # ----------------------------------------------------
-        # DISPLAY
-        # ----------------------------------------------------
-
-        if valid_face is not None:
-
-            x, y, width, height = valid_face
-
-            difference = calculate_frame_difference(
-                current_face,
-                previous_face
-            )
-
-            if previous_face is None:
-
-                quality_message = (
-                    "FACE READY - SPACE TO CAPTURE"
-                )
-
-            elif difference >= MIN_FRAME_DIFFERENCE:
-
-                quality_message = (
-                    "GOOD VARIATION - SPACE TO CAPTURE"
-                )
-
-            else:
-
-                quality_message = (
-                    "TOO SIMILAR - MOVE SLIGHTLY"
-                )
 
             cv2.rectangle(
                 frame,
@@ -418,31 +98,11 @@ def register_person():
                 2
             )
 
-            cv2.putText(
-                frame,
-                quality_message,
-                (20, 40),
-                cv2.FONT_HERSHEY_SIMPLEX,
-                0.65,
-                (0, 255, 0),
-                2
-            )
-
-            cv2.putText(
-                frame,
-                f"Sharpness: {blur_score:.0f}",
-                (20, 70),
-                cv2.FONT_HERSHEY_SIMPLEX,
-                0.60,
-                (0, 255, 0),
-                2
-            )
-
         elif len(faces) > 1:
 
             cv2.putText(
                 frame,
-                "ONLY ONE FACE ALLOWED",
+                "Only one person should be visible",
                 (20, 40),
                 cv2.FONT_HERSHEY_SIMPLEX,
                 0.7,
@@ -454,7 +114,7 @@ def register_person():
 
             cv2.putText(
                 frame,
-                "FACE NOT DETECTED",
+                "No face detected",
                 (20, 40),
                 cv2.FONT_HERSHEY_SIMPLEX,
                 0.7,
@@ -464,337 +124,467 @@ def register_person():
 
         cv2.putText(
             frame,
-            f"Images: {image_count}/{SAMPLES_REQUIRED}",
-            (20, 105),
+            f"Samples: {len(embeddings)}/{SAMPLES_REQUIRED}",
+            (20, 75),
             cv2.FONT_HERSHEY_SIMPLEX,
             0.7,
-            (255, 255, 255),
+            (0, 255, 0),
             2
         )
 
         cv2.imshow(
-            "SENTRIX - Stable Face Registration",
+            "SentriX - Face Registration",
             frame
         )
 
-        # ----------------------------------------------------
-        # KEYBOARD
-        # ----------------------------------------------------
+        if cv2.waitKey(1) & 0xFF == ord("q"):
+            print("Registration cancelled.")
+            break
 
-        key = cv2.waitKey(1) & 0xFF
+    camera.release()
+    cv2.destroyAllWindows()
 
-        # ----------------------------------------------------
-        # SPACE - CAPTURE
-        # ----------------------------------------------------
+    if len(embeddings) != SAMPLES_REQUIRED:
+        print("Registration not completed.")
+        return
 
-        if key == 32:
+    # Average the samples into one representation
+    final_embedding = np.mean(
+        embeddings,
+        axis=0
+    )
 
-            if valid_face is None:
+    # Normalize the embedding
+    final_embedding = final_embedding / np.linalg.norm(
+        final_embedding
+    )
 
-                print(
-                    "Cannot capture."
-                )
+    person_file = os.path.join(
+        REGISTERED_FOLDER,
+        f"{name}.pkl"
+    )
 
-                if len(faces) == 0:
+    with open(person_file, "wb") as file:import os
+import pickle
 
-                    print(
-                        "Reason: Face not detected."
-                    )
+import cv2
+import numpy as np
 
-                elif len(faces) > 1:
+from mtcnn import MTCNN
+from keras_facenet import FaceNet
 
-                    print(
-                        "Reason: Multiple faces detected."
-                    )
 
-                else:
+REGISTERED_FOLDER = "registered_faces"
 
-                    print(
-                        "Reason: Face quality is too low."
-                    )
+# 10 poses × 4 samples = 40 samples
+SAMPLES_PER_POSE = 4
 
-                continue
+POSES = [
+    "Look straight at the camera",
+    "Turn your face slightly LEFT",
+    "Turn your face more LEFT",
+    "Turn your face slightly RIGHT",
+    "Turn your face more RIGHT",
+    "Look slightly UP",
+    "Look slightly DOWN",
+    "Tilt your head LEFT",
+    "Tilt your head RIGHT",
+    "Return to natural position"
+]
 
-            difference = calculate_frame_difference(
-                current_face,
-                previous_face
-            )
+TOTAL_SAMPLES = len(POSES) * SAMPLES_PER_POSE
 
-            if (
-                previous_face is not None
-                and
-                difference < MIN_FRAME_DIFFERENCE
-            ):
 
-                print(
-                    "Capture rejected: "
-                    "too similar to previous image."
-                )
+def get_embedding(face_image, embedder):
+    """
+    Convert a cropped face into a normalized FaceNet embedding.
+    """
 
-                print(
-                    "Move your head slightly."
-                )
+    face_image = cv2.resize(
+        face_image,
+        (160, 160)
+    )
 
-                continue
+    face_image = np.expand_dims(
+        face_image,
+        axis=0
+    )
 
-            # ------------------------------------------------
-            # SAVE FACE
-            # ------------------------------------------------
+    embedding = embedder.embeddings(
+        face_image
+    )[0]
 
-            filename = os.path.join(
-                person_folder,
-                f"{image_count + 1:03d}.jpg"
-            )
+    embedding = embedding / (
+        np.linalg.norm(embedding) + 1e-10
+    )
 
-            success = cv2.imwrite(
-                filename,
-                current_face
-            )
+    return embedding.astype(np.float32)
+
+
+def register_person():
+
+    name = input(
+        "Enter person's name: "
+    ).strip()
+
+    if not name:
+        print("ERROR: Name cannot be empty.")
+        return
+
+    os.makedirs(
+        REGISTERED_FOLDER,
+        exist_ok=True
+    )
+
+    print("\nLoading MTCNN...")
+    detector = MTCNN()
+
+    print("Loading FaceNet...")
+    embedder = FaceNet()
+
+    camera = cv2.VideoCapture(
+        0,
+        cv2.CAP_MSMF
+    )
+
+    if not camera.isOpened():
+
+        print(
+            "ERROR: Could not open camera."
+        )
+
+        return
+
+    embeddings = []
+
+    print("\n========================================")
+    print("       SENTRIX FACE REGISTRATION")
+    print("========================================")
+    print(f"Person        : {name}")
+    print(f"Total samples : {TOTAL_SAMPLES}")
+    print(f"Samples/pose  : {SAMPLES_PER_POSE}")
+
+    print("\nControls:")
+    print("SPACE = capture sample")
+    print("Q     = cancel")
+
+    print("\nFollow each pose shown on screen.")
+    print("Make small natural movements between captures.\n")
+
+    # ----------------------------------------
+    # PROCESS EACH POSE
+    # ----------------------------------------
+
+    for pose_index, pose_instruction in enumerate(POSES):
+
+        pose_samples = 0
+
+        while pose_samples < SAMPLES_PER_POSE:
+
+            success, frame = camera.read()
 
             if not success:
 
                 print(
-                    "ERROR: Could not save image."
+                    "ERROR: Could not read frame."
                 )
 
-                continue
+                camera.release()
+                cv2.destroyAllWindows()
 
-            image_count += 1
+                return
 
-            previous_face = current_face.copy()
-
-            print(
-                f"Captured "
-                f"{image_count}/{SAMPLES_REQUIRED} | "
-                f"Sharpness: {blur_score:.0f} | "
-                f"Variation: {difference:.3f}"
+            # MTCNN expects RGB
+            rgb_frame = cv2.cvtColor(
+                frame,
+                cv2.COLOR_BGR2RGB
             )
 
-        # ----------------------------------------------------
-        # Q - CANCEL
-        # ----------------------------------------------------
-
-        elif key == ord("q"):
-
-            print(
-                "Registration cancelled."
+            # Detect faces
+            faces = detector.detect_faces(
+                rgb_frame
             )
 
-            break
+            # ----------------------------------------
+            # TEXT INFORMATION
+            # ----------------------------------------
+
+            cv2.putText(
+                frame,
+                f"POSE {pose_index + 1}/{len(POSES)}",
+                (20, 35),
+                cv2.FONT_HERSHEY_SIMPLEX,
+                0.75,
+                (0, 255, 255),
+                2
+            )
+
+            cv2.putText(
+                frame,
+                pose_instruction,
+                (20, 70),
+                cv2.FONT_HERSHEY_SIMPLEX,
+                0.60,
+                (0, 255, 255),
+                2
+            )
+
+            cv2.putText(
+                frame,
+                f"Pose samples: "
+                f"{pose_samples}/{SAMPLES_PER_POSE}",
+                (20, 105),
+                cv2.FONT_HERSHEY_SIMPLEX,
+                0.65,
+                (0, 255, 0),
+                2
+            )
+
+            cv2.putText(
+                frame,
+                f"Total: "
+                f"{len(embeddings)}/{TOTAL_SAMPLES}",
+                (20, 140),
+                cv2.FONT_HERSHEY_SIMPLEX,
+                0.65,
+                (0, 255, 0),
+                2
+            )
+
+            # ----------------------------------------
+            # FACE DETECTION
+            # ----------------------------------------
+
+            if len(faces) == 1:
+
+                face = faces[0]
+
+                x, y, width, height = face["box"]
+
+                # Prevent invalid coordinates
+                x = max(0, x)
+                y = max(0, y)
+
+                width = max(1, width)
+                height = max(1, height)
+
+                x2 = min(
+                    rgb_frame.shape[1],
+                    x + width
+                )
+
+                y2 = min(
+                    rgb_frame.shape[0],
+                    y + height
+                )
+
+                face_image = rgb_frame[
+                    y:y2,
+                    x:x2
+                ]
+
+                # Draw face box
+                cv2.rectangle(
+                    frame,
+                    (x, y),
+                    (x2, y2),
+                    (0, 255, 0),
+                    2
+                )
+
+                confidence = face.get(
+                    "confidence",
+                    0.0
+                )
+
+                cv2.putText(
+                    frame,
+                    f"Face confidence: "
+                    f"{confidence:.2f}",
+                    (20, 175),
+                    cv2.FONT_HERSHEY_SIMPLEX,
+                    0.55,
+                    (0, 255, 0),
+                    2
+                )
+
+                cv2.putText(
+                    frame,
+                    "Press SPACE to capture",
+                    (20, 210),
+                    cv2.FONT_HERSHEY_SIMPLEX,
+                    0.60,
+                    (255, 255, 255),
+                    2
+                )
+
+            elif len(faces) > 1:
+
+                cv2.putText(
+                    frame,
+                    "WARNING: Only ONE person allowed",
+                    (20, 175),
+                    cv2.FONT_HERSHEY_SIMPLEX,
+                    0.60,
+                    (0, 0, 255),
+                    2
+                )
+
+            else:
+
+                cv2.putText(
+                    frame,
+                    "No face detected",
+                    (20, 175),
+                    cv2.FONT_HERSHEY_SIMPLEX,
+                    0.60,
+                    (0, 0, 255),
+                    2
+                )
+
+            cv2.imshow(
+                "SentriX - Face Registration",
+                frame
+            )
+
+            key = cv2.waitKey(1) & 0xFF
+
+            # ----------------------------------------
+            # CANCEL
+            # ----------------------------------------
+
+            if key == ord("q"):
+
+                print(
+                    "\nRegistration cancelled."
+                )
+
+                camera.release()
+                cv2.destroyAllWindows()
+
+                return
+
+            # ----------------------------------------
+            # CAPTURE SAMPLE
+            # ----------------------------------------
+
+            if key == ord(" "):
+
+                # Exactly one face required
+                if len(faces) != 1:
+
+                    print(
+                        "Capture rejected: "
+                        "exactly one face must be visible."
+                    )
+
+                    continue
+
+                face = faces[0]
+
+                confidence = face.get(
+                    "confidence",
+                    0.0
+                )
+
+                # Reject weak detections
+                if confidence < 0.90:
+
+                    print(
+                        f"Capture rejected: "
+                        f"face confidence "
+                        f"{confidence:.2f} is too low."
+                    )
+
+                    continue
+
+                x, y, width, height = face["box"]
+
+                x = max(0, x)
+                y = max(0, y)
+
+                width = max(1, width)
+                height = max(1, height)
+
+                x2 = min(
+                    rgb_frame.shape[1],
+                    x + width
+                )
+
+                y2 = min(
+                    rgb_frame.shape[0],
+                    y + height
+                )
+
+                face_image = rgb_frame[
+                    y:y2,
+                    x:x2
+                ]
+
+                if face_image.size == 0:
+
+                    print(
+                        "Capture rejected: "
+                        "invalid face region."
+                    )
+
+                    continue
+
+                # Generate FaceNet embedding
+                embedding = get_embedding(
+                    face_image,
+                    embedder
+                )
+
+                embeddings.append(
+                    embedding
+                )
+
+                pose_samples += 1
+
+                print(
+                    f"Captured sample "
+                    f"{len(embeddings)}/{TOTAL_SAMPLES} "
+                    f"(Pose {pose_index + 1}, "
+                    f"{pose_samples}/{SAMPLES_PER_POSE})"
+                )
+
+    # ----------------------------------------
+    # CLEANUP CAMERA
+    # ----------------------------------------
 
     camera.release()
-
     cv2.destroyAllWindows()
 
-    # --------------------------------------------------------
-    # CHECK COMPLETION
-    # --------------------------------------------------------
+    # ----------------------------------------
+    # VERIFY SAMPLE COUNT
+    # ----------------------------------------
 
-    if image_count < SAMPLES_REQUIRED:
+    if len(embeddings) != TOTAL_SAMPLES:
 
-        print()
         print(
-            f"Only {image_count} images captured."
+            "\nRegistration failed."
         )
 
         print(
-            f"Need "
-            f"{SAMPLES_REQUIRED - image_count} more."
+            f"Expected {TOTAL_SAMPLES} samples, "
+            f"got {len(embeddings)}."
         )
 
         return
 
-    print()
-    print(
-        "40 quality-controlled images captured successfully."
-    )
-
-    # --------------------------------------------------------
-    # GENERATE EMBEDDINGS
-    # --------------------------------------------------------
-
-    generate_embeddings_from_dataset(
-        name,
-        person_folder
-    )
-
-
-# ============================================================
-# GENERATE EMBEDDINGS
-# ============================================================
-
-def generate_embeddings_from_dataset(
-    name,
-    person_folder
-):
-
-    print()
-    print("==========================================")
-    print("GENERATING FACENET EMBEDDINGS")
-    print("==========================================")
-
-    image_files = sorted(
-        [
-            filename
-            for filename in os.listdir(person_folder)
-            if filename.lower().endswith(
-                (".jpg", ".jpeg", ".png")
-            )
-        ]
-    )
-
-    if not image_files:
-
-        print(
-            "ERROR: No images found."
-        )
-
-        return
-
-    print(
-        f"Found {len(image_files)} images."
-    )
-
-    print(
-        "Loading FaceNet..."
-    )
-
-    embedder = FaceNet()
-
-    embeddings = []
-
-    for index, filename in enumerate(
-        image_files,
-        start=1
-    ):
-
-        filepath = os.path.join(
-            person_folder,
-            filename
-        )
-
-        image = cv2.imread(
-            filepath
-        )
-
-        if image is None:
-
-            print(
-                f"Skipping unreadable image: "
-                f"{filename}"
-            )
-
-            continue
-
-        # ----------------------------------------------------
-        # CHECK BLUR AGAIN
-        # ----------------------------------------------------
-
-        blur_score = calculate_blur_score(
-            image
-        )
-
-        if blur_score < MIN_BLUR_VARIANCE:
-
-            print(
-                f"Skipping blurry image: "
-                f"{filename} "
-                f"(sharpness={blur_score:.1f})"
-            )
-
-            continue
-
-        # ----------------------------------------------------
-        # RGB
-        # ----------------------------------------------------
-
-        image = cv2.cvtColor(
-            image,
-            cv2.COLOR_BGR2RGB
-        )
-
-        image = cv2.resize(
-            image,
-            (160, 160)
-        )
-
-        image = np.expand_dims(
-            image,
-            axis=0
-        )
-
-        # ----------------------------------------------------
-        # FACENET
-        # ----------------------------------------------------
-
-        embedding = embedder.embeddings(
-            image
-        )[0]
-
-        # ----------------------------------------------------
-        # NORMALIZE
-        # ----------------------------------------------------
-
-        norm = np.linalg.norm(
-            embedding
-        )
-
-        if norm < 1e-10:
-
-            print(
-                f"Skipping invalid embedding: "
-                f"{filename}"
-            )
-
-            continue
-
-        embedding = (
-            embedding / norm
-        )
-
-        # ----------------------------------------------------
-        # EMBEDDING QUALITY CHECK
-        # ----------------------------------------------------
-
-        if not np.all(
-            np.isfinite(embedding)
-        ):
-
-            print(
-                f"Skipping invalid values: "
-                f"{filename}"
-            )
-
-            continue
-
-        embeddings.append(
-            embedding.astype(
-                np.float32
-            )
-        )
-
-        print(
-            f"Processed "
-            f"{index}/{len(image_files)}: "
-            f"{filename}"
-        )
-
-    if not embeddings:
-
-        print(
-            "ERROR: No valid embeddings generated."
-        )
-
-        return
+    # ----------------------------------------
+    # CONVERT TO NUMPY ARRAY
+    # ----------------------------------------
 
     embeddings = np.asarray(
         embeddings,
         dtype=np.float32
     )
 
-    # --------------------------------------------------------
-    # SAVE
-    # --------------------------------------------------------
+    # ----------------------------------------
+    # SAVE ALL EMBEDDINGS
+    # ----------------------------------------
 
     person_file = os.path.join(
         REGISTERED_FOLDER,
@@ -806,41 +596,35 @@ def generate_embeddings_from_dataset(
         "embeddings": embeddings
     }
 
-    with open(
-        person_file,
-        "wb"
-    ) as file:
+    with open(person_file, "wb") as file:
+        pickle.dump(data, file)
+    # ----------------------------------------
+    # SUCCESS MESSAGE
+    # ----------------------------------------
 
-        pickle.dump(
-            data,
+    print("\n========================================")
+    print("       REGISTRATION SUCCESSFUL")
+    print("========================================")
+    print(f"Person        : {name}")
+    print(f"Samples       : {len(embeddings)}")
+    print(f"Embeddings    : {embeddings.shape}")
+    print(f"Saved file    : {person_file}")
+    print("========================================")
+
+
+if __name__ == "__main__":
+    register_person()
+    pickle.dump(
+            {
+                "name": name,
+                "embedding": final_embedding
+            },
             file
         )
 
-    print()
-    print("==========================================")
-    print("REGISTRATION SUCCESSFUL")
-    print("==========================================")
-    print(f"Person     : {name}")
-    print(f"Images     : {len(embeddings)}")
-    print(f"Embedding  : {embeddings.shape}")
-    print(f"Saved      : {person_file}")
-    print("==========================================")
-    print()
+    print(f"\nRegistration successful!")
+    print(f"Saved: {person_file}")
 
-    add_person(
-        name=name,
-        role="Person"
-    )
-
-    print(
-        f"Person '{name}' added to SENTRIX database."
-    )
-
-
-# ============================================================
-# MAIN
-# ============================================================
 
 if __name__ == "__main__":
-
     register_person()

@@ -1,424 +1,98 @@
+"""Camera movement detection using ORB features and robust affine matching."""
 import cv2
 import numpy as np
 
-
-# ============================================================
-# CAMERA MOVEMENT DETECTION CONFIGURATION
-# ============================================================
-
-# Minimum number of good feature matches required.
-MIN_GOOD_MATCHES = 18
-
-# Camera movement is confirmed when the estimated transform
-# indicates sufficient translation/rotation.
-MIN_TRANSLATION_PIXELS = 25.0
-MIN_ROTATION_DEGREES = 4.0
-
-# Consecutive frames required before declaring movement.
-CHANGE_CONFIRMATION_FRAMES = 8
-
-# After movement is confirmed, the reference frame is updated
-# so the same movement does not trigger continuously.
-REFERENCE_UPDATE_AFTER_MOVEMENT = True
-
-# Process a smaller image for faster detection.
-PROCESS_WIDTH = 640
+ANALYSIS_WIDTH = 320
+MIN_GOOD_MATCHES = 8
+MIN_INLIER_RATIO = 0.50
+MOVE_CONFIRMATION_FRAMES = 3
+MIN_SHIFT_RATIO = 0.025
+MIN_ROTATION_DEGREES = 1.5
+MIN_SCALE_CHANGE = 0.025
+RANSAC_REPROJECTION_THRESHOLD = 3.0
 
 
-# ============================================================
-# IMAGE PREPARATION
-# ============================================================
-
-def prepare_frame(frame):
-    """
-    Resize and convert frame to grayscale.
-    """
-
+def _small_gray(frame):
     height, width = frame.shape[:2]
+    if width > ANALYSIS_WIDTH:
+        new_height = max(1, int(height * ANALYSIS_WIDTH / width))
+        frame = cv2.resize(frame, (ANALYSIS_WIDTH, new_height), interpolation=cv2.INTER_AREA)
+    if frame.ndim == 3:
+        return cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+    return frame
 
-    if width > PROCESS_WIDTH:
-
-        scale = PROCESS_WIDTH / float(width)
-
-        new_height = int(
-            height * scale
-        )
-
-        frame = cv2.resize(
-            frame,
-            (
-                PROCESS_WIDTH,
-                new_height
-            ),
-            interpolation=cv2.INTER_AREA
-        )
-
-    gray = cv2.cvtColor(
-        frame,
-        cv2.COLOR_BGR2GRAY
-    )
-
-    # Slight blur reduces noise.
-    gray = cv2.GaussianBlur(
-        gray,
-        (5, 5),
-        0
-    )
-
-    return gray
-
-
-# ============================================================
-# HISTOGRAM
-# ============================================================
 
 def calculate_histogram(frame):
+    gray = _small_gray(frame)
+    hist = cv2.calcHist([gray], [0], None, [64], [0, 256])
+    cv2.normalize(hist, hist, alpha=1.0, norm_type=cv2.NORM_L1)
+    return hist
 
-    gray = prepare_frame(frame)
-
-    histogram = cv2.calcHist(
-        [gray],
-        [0],
-        None,
-        [256],
-        [0, 256]
-    )
-
-    cv2.normalize(
-        histogram,
-        histogram
-    )
-
-    return histogram
-
-
-# ============================================================
-# FEATURE-BASED CAMERA MOVEMENT DETECTOR
-# ============================================================
 
 class SceneChangeDetector:
-
     def __init__(self, reference_frame):
-
-        self.reference_frame = prepare_frame(
-            reference_frame
-        )
-
-        # ORB is lightweight and suitable for real-time
-        # camera movement detection.
-        self.orb = cv2.ORB_create(
-            nfeatures=500,
-            scaleFactor=1.2,
-            nlevels=8,
-            edgeThreshold=31,
-            fastThreshold=20
-        )
-
-        self.reference_keypoints, self.reference_descriptors = (
-            self.orb.detectAndCompute(
-                self.reference_frame,
-                None
-            )
-        )
-
-        self.matcher = cv2.BFMatcher(
-            cv2.NORM_HAMMING,
-            crossCheck=False
-        )
-
+        if reference_frame is None or reference_frame.size == 0:
+            raise ValueError("A valid reference camera frame is required.")
+        self.reference_gray = _small_gray(reference_frame)
+        self.reference_histogram = self._hist(self.reference_gray)
+        self.orb = cv2.ORB_create(nfeatures=500, scaleFactor=1.2, nlevels=6, fastThreshold=10)
+        self.matcher = cv2.BFMatcher(cv2.NORM_HAMMING)
+        self.reference_keypoints, self.reference_descriptors = self.orb.detectAndCompute(self.reference_gray, None)
         self.changed_frames = 0
+        self.last_movement_candidate = False
 
-        # Keep histogram as a secondary measurement.
-        self.reference_histogram = (
-            calculate_histogram(
-                reference_frame
-            )
-        )
+    @staticmethod
+    def _hist(gray):
+        hist = cv2.calcHist([gray], [0], None, [64], [0, 256])
+        cv2.normalize(hist, hist, alpha=1.0, norm_type=cv2.NORM_L1)
+        return hist
 
-        self.last_correlation = 1.0
+    def detect(self, current_frame):
+        if current_frame is None or current_frame.size == 0:
+            self.last_movement_candidate = False
+            return False, 0.0
 
-    # ========================================================
-    # ESTIMATE CAMERA MOVEMENT
-    # ========================================================
+        gray = _small_gray(current_frame)
+        hist = self._hist(gray)
+        correlation = float(cv2.compareHist(self.reference_histogram, hist, cv2.HISTCMP_CORREL))
+        moved_now = False
+        self.last_movement_candidate = False
+        keypoints, descriptors = self.orb.detectAndCompute(gray, None)
 
-    def _estimate_movement(
-        self,
-        current_frame
-    ):
-
-        current_gray = prepare_frame(
-            current_frame
-        )
-
-        current_keypoints, current_descriptors = (
-            self.orb.detectAndCompute(
-                current_gray,
-                None
-            )
-        )
-
-        # Not enough features.
-        if (
-            current_descriptors is None
-            or self.reference_descriptors is None
-        ):
-
-            return False, 0.0, 0.0, 0
-
-        if (
-            len(current_keypoints) < 8
-            or len(self.reference_keypoints) < 8
-        ):
-
-            return False, 0.0, 0.0, 0
-
-        try:
-
-            matches = self.matcher.knnMatch(
-                self.reference_descriptors,
-                current_descriptors,
-                k=2
-            )
-
-        except Exception:
-
-            return False, 0.0, 0.0, 0
-
-        # Lowe ratio test.
-        good_matches = []
-
-        for pair in matches:
-
-            if len(pair) < 2:
-                continue
-
-            m, n = pair
-
-            if m.distance < 0.72 * n.distance:
-
-                good_matches.append(m)
-
-        good_match_count = len(
-            good_matches
-        )
-
-        if good_match_count < MIN_GOOD_MATCHES:
-
-            return False, 0.0, 0.0, good_match_count
-
-        # ----------------------------------------------------
-        # SOURCE / DESTINATION POINTS
-        # ----------------------------------------------------
-
-        src_points = np.float32([
-            self.reference_keypoints[m.queryIdx].pt
-            for m in good_matches
-        ]).reshape(-1, 1, 2)
-
-        dst_points = np.float32([
-            current_keypoints[m.trainIdx].pt
-            for m in good_matches
-        ]).reshape(-1, 1, 2)
-
-        # ----------------------------------------------------
-        # ESTIMATE AFFINE TRANSFORMATION
-        # ----------------------------------------------------
-
-        matrix, mask = cv2.estimateAffinePartial2D(
-            src_points,
-            dst_points,
-            method=cv2.RANSAC,
-            ransacReprojThreshold=3.0,
-            maxIters=2000,
-            confidence=0.99
-        )
-
-        if matrix is None:
-
-            return False, 0.0, 0.0, good_match_count
-
-        # ----------------------------------------------------
-        # TRANSLATION
-        # ----------------------------------------------------
-
-        tx = float(
-            matrix[0, 2]
-        )
-
-        ty = float(
-            matrix[1, 2]
-        )
-
-        translation = (
-            (tx ** 2)
-            + (ty ** 2)
-        ) ** 0.5
-
-        # ----------------------------------------------------
-        # ROTATION
-        # ----------------------------------------------------
-
-        rotation_radians = np.arctan2(
-            matrix[1, 0],
-            matrix[0, 0]
-        )
-
-        rotation_degrees = abs(
-            np.degrees(
-                rotation_radians
-            )
-        )
-
-        # ----------------------------------------------------
-        # INLIER COUNT
-        # ----------------------------------------------------
-
-        inlier_count = 0
-
-        if mask is not None:
-
-            inlier_count = int(
-                mask.sum()
-            )
-
-        # Require enough reliable inliers.
-        if inlier_count < 12:
-
-            return (
-                False,
-                translation,
-                rotation_degrees,
-                good_match_count
-            )
-
-        movement_detected = (
-            translation >= MIN_TRANSLATION_PIXELS
-            or rotation_degrees >= MIN_ROTATION_DEGREES
-        )
-
-        return (
-            movement_detected,
-            translation,
-            rotation_degrees,
-            good_match_count
-        )
-
-    # ========================================================
-    # DETECT
-    # ========================================================
-
-    def detect(
-        self,
-        current_frame
-    ):
-
-        # ----------------------------------------------------
-        # HISTOGRAM CORRELATION
-        # ----------------------------------------------------
-
-        current_histogram = (
-            calculate_histogram(
-                current_frame
-            )
-        )
-
-        correlation = cv2.compareHist(
-            self.reference_histogram,
-            current_histogram,
-            cv2.HISTCMP_CORREL
-        )
-
-        self.last_correlation = correlation
-
-        # ----------------------------------------------------
-        # FEATURE MOVEMENT
-        # ----------------------------------------------------
-
-        (
-            movement_detected,
-            translation,
-            rotation,
-            good_matches
-        ) = self._estimate_movement(
-            current_frame
-        )
-
-        # ----------------------------------------------------
-        # CONFIRMATION
-        # ----------------------------------------------------
-
-        if movement_detected:
-
-            self.changed_frames += 1
-
-        else:
-
-            self.changed_frames = max(
-                0,
-                self.changed_frames - 1
-            )
-
-        moved = (
-            self.changed_frames
-            >= CHANGE_CONFIRMATION_FRAMES
-        )
-
-        # ----------------------------------------------------
-        # UPDATE REFERENCE
-        # ----------------------------------------------------
-
-        if moved:
-
-            if REFERENCE_UPDATE_AFTER_MOVEMENT:
-
-                self.reference_frame = (
-                    prepare_frame(
-                        current_frame
-                    )
+        if (self.reference_descriptors is not None and descriptors is not None
+                and len(self.reference_keypoints) >= MIN_GOOD_MATCHES
+                and len(keypoints) >= MIN_GOOD_MATCHES):
+            pairs = self.matcher.knnMatch(self.reference_descriptors, descriptors, k=2)
+            good = [pair[0] for pair in pairs if len(pair) == 2 and pair[0].distance < 0.75 * pair[1].distance]
+            if len(good) >= MIN_GOOD_MATCHES:
+                src = np.float32([self.reference_keypoints[m.queryIdx].pt for m in good]).reshape(-1, 1, 2)
+                dst = np.float32([keypoints[m.trainIdx].pt for m in good]).reshape(-1, 1, 2)
+                matrix, inliers = cv2.estimateAffinePartial2D(
+                    src, dst, method=cv2.RANSAC,
+                    ransacReprojThreshold=RANSAC_REPROJECTION_THRESHOLD,
+                    maxIters=500, confidence=0.99, refineIters=5,
                 )
+                if matrix is not None and inliers is not None:
+                    inlier_count = int(inliers.sum())
+                    inlier_ratio = inlier_count / max(len(good), 1)
+                    if inlier_count >= MIN_GOOD_MATCHES and inlier_ratio >= MIN_INLIER_RATIO:
+                        height, width = gray.shape
+                        dx = abs(float(matrix[0, 2])) / max(width, 1)
+                        dy = abs(float(matrix[1, 2])) / max(height, 1)
+                        angle = abs(float(np.degrees(np.arctan2(matrix[1, 0], matrix[0, 0]))))
+                        scale = float(np.sqrt(matrix[0, 0] ** 2 + matrix[1, 0] ** 2))
+                        moved_now = (
+                            dx >= MIN_SHIFT_RATIO or dy >= MIN_SHIFT_RATIO
+                            or angle >= MIN_ROTATION_DEGREES
+                            or abs(scale - 1.0) >= MIN_SCALE_CHANGE
+                        )
 
-                (
-                    self.reference_keypoints,
-                    self.reference_descriptors
-                ) = self.orb.detectAndCompute(
-                    self.reference_frame,
-                    None
-                )
-
-                self.reference_histogram = (
-                    calculate_histogram(
-                        current_frame
-                    )
-                )
-
-            self.changed_frames = 0
-
-        return moved, correlation
+        self.last_movement_candidate = moved_now
+        self.changed_frames = self.changed_frames + 1 if moved_now else 0
+        return self.changed_frames >= MOVE_CONFIRMATION_FRAMES, correlation
 
 
-# ============================================================
-# SIMPLE SCENE CHANGE FUNCTION
-# ============================================================
-
-def detect_scene_change(
-    reference_histogram,
-    current_frame
-):
-
-    current_histogram = (
-        calculate_histogram(
-            current_frame
-        )
-    )
-
-    correlation = cv2.compareHist(
-        reference_histogram,
-        current_histogram,
-        cv2.HISTCMP_CORREL
-    )
-
-    # This function is kept for compatibility with
-    # any other code in the project.
-    moved = correlation < -0.20
-
-    return moved, correlation
+def detect_scene_change(reference_histogram, current_frame):
+    current_histogram = calculate_histogram(current_frame)
+    correlation = float(cv2.compareHist(reference_histogram, current_histogram, cv2.HISTCMP_CORREL))
+    return correlation < 0.70, correlation

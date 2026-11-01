@@ -1,30 +1,28 @@
 import os
-import re
-import math
 import tempfile
+import shutil
 from datetime import datetime
-from collections import Counter, defaultdict
-
-import matplotlib
-matplotlib.use("Agg")
-
-import matplotlib.pyplot as plt
-import numpy as np
 
 from reportlab.lib import colors
 from reportlab.lib.enums import TA_CENTER, TA_LEFT
 from reportlab.lib.pagesizes import A4
-from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 from reportlab.lib.units import mm
 from reportlab.platypus import (
     SimpleDocTemplate,
     Paragraph,
     Spacer,
-    Image,
     Table,
     TableStyle,
+    Image,
     PageBreak,
-    KeepTogether
+)
+from app.reports.visualizer import report_visualizer
+from app.database.db import (
+    get_events_by_date,
+    get_hourly_activity,
+    get_tamper_summary,
+    get_event_type_distribution
 )
 
 
@@ -40,942 +38,472 @@ BASE_DIR = os.path.abspath(
     )
 )
 
-REPORTS_FOLDER = os.path.join(BASE_DIR, "reports")
-
-os.makedirs(REPORTS_FOLDER, exist_ok=True)
-
-
-# ============================================================
-# REPORT SETTINGS
-# ============================================================
-
-PAGE_WIDTH, PAGE_HEIGHT = A4
-
-CHART_WIDTH = 175
-CHART_HEIGHT = 78
-
-DATE_FORMATS = [
-    "%Y-%m-%d %H:%M:%S",
-    "%Y-%m-%d %H:%M",
-]
+REPORTS_FOLDER = os.path.join(
+    BASE_DIR,
+    "reports"
+)
 
 
 # ============================================================
-# EVENT PARSING
+# COLORS
 # ============================================================
 
-def parse_event(event):
-    """
-    Convert SENTRIX event text into:
+NAVY = colors.HexColor("#0F172A")
+DARK_BLUE = colors.HexColor("#1E3A8A")
+BLUE = colors.HexColor("#2563EB")
+LIGHT_BLUE = colors.HexColor("#EFF6FF")
 
-        {
-            "datetime": datetime,
-            "message": str,
-            "category": str,
-            "person": str | None
-        }
+GREEN = colors.HexColor("#16A34A")
+LIGHT_GREEN = colors.HexColor("#F0FDF4")
 
-    Expected event format:
+RED = colors.HexColor("#DC2626")
+LIGHT_RED = colors.HexColor("#FEF2F2")
 
-        2026-09-24 10:15:20 - Motion detected
-    """
+ORANGE = colors.HexColor("#EA580C")
+LIGHT_ORANGE = colors.HexColor("#FFF7ED")
 
-    if not isinstance(event, str):
-        return None
+WHITE = colors.white
 
-    event = event.strip()
+TEXT = colors.HexColor("#1E293B")
+SECONDARY = colors.HexColor("#64748B")
 
-    match = re.match(
-        r"^(\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2})\s*-\s*(.*)$",
-        event
-    )
-
-    if not match:
-        return None
-
-    timestamp_text = match.group(1)
-    message = match.group(2).strip()
-
-    timestamp = None
-
-    for fmt in DATE_FORMATS:
-        try:
-            timestamp = datetime.strptime(timestamp_text, fmt)
-            break
-        except ValueError:
-            continue
-
-    if timestamp is None:
-        return None
-
-    message_lower = message.lower()
-
-    # --------------------------------------------------------
-    # CATEGORY DETECTION
-    # --------------------------------------------------------
-
-    if "tamper" in message_lower:
-        category = "Tamper"
-
-    elif "unknown person" in message_lower:
-        category = "Unknown Person"
-
-    elif "recognized" in message_lower:
-        category = "Known Person"
-
-    elif "motion" in message_lower:
-        category = "Motion"
-
-    elif "recording started" in message_lower:
-        category = "Recording"
-
-    elif "recording stopped" in message_lower:
-        category = "Recording"
-
-    elif "camera" in message_lower:
-        category = "Camera"
-
-    else:
-        category = "System"
-
-    # --------------------------------------------------------
-    # PERSON NAME
-    # --------------------------------------------------------
-
-    person = None
-
-    if category == "Known Person":
-
-        person_match = re.search(
-            r"(.+?)\s+recognized",
-            message,
-            re.IGNORECASE
-        )
-
-        if person_match:
-            person = person_match.group(1).strip()
-
-    return {
-        "datetime": timestamp,
-        "message": message,
-        "category": category,
-        "person": person
-    }
+GRAY_50 = colors.HexColor("#F8FAFC")
+GRAY_100 = colors.HexColor("#F1F5F9")
+GRAY_200 = colors.HexColor("#E2E8F0")
+GRAY_300 = colors.HexColor("#CBD5E1")
 
 
 # ============================================================
-# FILTER EVENTS BY DATE
+# PAGE HEADER / FOOTER
 # ============================================================
 
-def prepare_events(selected_date, current_events):
-
-    parsed = []
-
-    for event in current_events or []:
-
-        item = parse_event(event)
-
-        if item is None:
-            continue
-
-        if item["datetime"].strftime("%Y-%m-%d") != selected_date:
-            continue
-
-        parsed.append(item)
-
-    parsed.sort(
-        key=lambda x: x["datetime"]
-    )
-
-    return parsed
-
-
-# ============================================================
-# RECORDING PARSER
-# ============================================================
-
-def parse_recording_time(filename):
-
-    """
-    Tries to extract a timestamp from common SENTRIX
-    recording names.
-
-    Example:
-
-        SENTRIX_20260924_101530.mp4
-        recording_20260924_101530.mp4
-    """
-
-    if not filename:
-        return None
-
-    patterns = [
-        r"(\d{8})[_-](\d{6})",
-        r"(\d{4}-\d{2}-\d{2})[_-](\d{2}-\d{2}-\d{2})",
-    ]
-
-    for pattern in patterns:
-
-        match = re.search(
-            pattern,
-            filename
-        )
-
-        if not match:
-            continue
-
-        try:
-
-            if len(match.groups()) == 2:
-
-                first = match.group(1)
-                second = match.group(2)
-
-                if len(first) == 8:
-
-                    return datetime.strptime(
-                        first + second,
-                        "%Y%m%d%H%M%S"
-                    )
-
-        except ValueError:
-            pass
-
-    return None
-
-
-# ============================================================
-# CHART 1
-# ACTIVITY OVER 24 HOURS
-# ============================================================
-
-def create_activity_timeline(events, output):
-
-    hourly = [0] * 24
-
-    for event in events:
-        hour = event["datetime"].hour
-        hourly[hour] += 1
-
-    hours = list(range(24))
-
-    plt.figure(
-        figsize=(10, 4.2)
-    )
-
-    plt.plot(
-        hours,
-        hourly,
-        marker="o",
-        linewidth=2
-    )
-
-    plt.xticks(
-        hours,
-        [f"{h:02d}" for h in hours],
-        fontsize=8
-    )
-
-    plt.xlabel("Hour of Day")
-    plt.ylabel("Activity")
-    plt.title(
-        "SENTRIX Activity Timeline"
-    )
-
-    plt.grid(
-        True,
-        alpha=0.25
-    )
-
-    plt.tight_layout()
-
-    plt.savefig(
-        output,
-        dpi=180,
-        bbox_inches="tight"
-    )
-
-    plt.close()
-
-
-# ============================================================
-# CHART 2
-# HOURLY CATEGORY ACTIVITY
-# ============================================================
-
-def create_hourly_activity(events, output):
-
-    categories = [
-        "Motion",
-        "Known Person",
-        "Unknown Person",
-        "Tamper"
-    ]
-
-    data = {
-        category: [0] * 24
-        for category in categories
-    }
-
-    for event in events:
-
-        category = event["category"]
-
-        if category not in data:
-            continue
-
-        hour = event["datetime"].hour
-
-        data[category][hour] += 1
-
-    hours = np.arange(24)
-
-    plt.figure(
-        figsize=(10, 4.5)
-    )
-
-    width = 0.18
-
-    for index, category in enumerate(categories):
-
-        positions = (
-            hours
-            + (index - 1.5) * width
-        )
-
-        plt.bar(
-            positions,
-            data[category],
-            width=width,
-            label=category
-        )
-
-    plt.xticks(
-        hours,
-        [f"{h:02d}" for h in hours],
-        fontsize=8
-    )
-
-    plt.xlabel("Hour of Day")
-    plt.ylabel("Occurrences")
-
-    plt.title(
-        "Hourly Security Activity"
-    )
-
-    plt.legend(
-        fontsize=8,
-        ncol=2
-    )
-
-    plt.grid(
-        axis="y",
-        alpha=0.25
-    )
-
-    plt.tight_layout()
-
-    plt.savefig(
-        output,
-        dpi=180,
-        bbox_inches="tight"
-    )
-
-    plt.close()
-
-
-# ============================================================
-# CHART 3
-# EVENT DISTRIBUTION
-# ============================================================
-
-def create_event_distribution(events, output):
-
-    counter = Counter()
-
-    for event in events:
-
-        category = event["category"]
-
-        if category in [
-            "Motion",
-            "Known Person",
-            "Unknown Person",
-            "Tamper",
-            "Recording"
-        ]:
-            counter[category] += 1
-
-    if not counter:
-        counter["No Data"] = 1
-
-    labels = list(counter.keys())
-    values = list(counter.values())
-
-    plt.figure(
-        figsize=(7, 5)
-    )
-
-    plt.pie(
-        values,
-        labels=labels,
-        autopct="%1.1f%%",
-        startangle=90
-    )
-
-    plt.title(
-        "Security Activity Distribution"
-    )
-
-    plt.tight_layout()
-
-    plt.savefig(
-        output,
-        dpi=180,
-        bbox_inches="tight"
-    )
-
-    plt.close()
-
-
-# ============================================================
-# CHART 4
-# PEOPLE DETECTED
-# ============================================================
-
-def create_people_chart(events, output):
-
-    people = Counter()
-    unknown = 0
-
-    for event in events:
-
-        if event["category"] == "Known Person":
-
-            name = event["person"]
-
-            if name:
-                people[name] += 1
-
-        elif event["category"] == "Unknown Person":
-
-            unknown += 1
-
-    if unknown > 0:
-        people["Unknown"] = unknown
-
-    if not people:
-        people["No Person Data"] = 0
-
-    labels = list(people.keys())
-    values = list(people.values())
-
-    plt.figure(
-        figsize=(8, 4.5)
-    )
-
-    plt.bar(
-        labels,
-        values
-    )
-
-    plt.title(
-        "Human Presence Analysis"
-    )
-
-    plt.xlabel("Person")
-    plt.ylabel("Detection Activity")
-
-    plt.xticks(
-        rotation=25,
-        ha="right"
-    )
-
-    plt.grid(
-        axis="y",
-        alpha=0.25
-    )
-
-    plt.tight_layout()
-
-    plt.savefig(
-        output,
-        dpi=180,
-        bbox_inches="tight"
-    )
-
-    plt.close()
-
-
-# ============================================================
-# CHART 5
-# ACTIVITY HEATMAP
-# ============================================================
-
-def create_activity_heatmap(events, output):
-
-    categories = [
-        "Motion",
-        "Known Person",
-        "Unknown Person",
-        "Tamper"
-    ]
-
-    matrix = np.zeros(
-        (len(categories), 24),
-        dtype=int
-    )
-
-    category_index = {
-        category: index
-        for index, category in enumerate(categories)
-    }
-
-    for event in events:
-
-        category = event["category"]
-
-        if category not in category_index:
-            continue
-
-        row = category_index[category]
-        column = event["datetime"].hour
-
-        matrix[row][column] += 1
-
-    plt.figure(
-        figsize=(11, 4.5)
-    )
-
-    plt.imshow(
-        matrix,
-        aspect="auto"
-    )
-
-    plt.xticks(
-        range(24),
-        [f"{h:02d}" for h in range(24)]
-    )
-
-    plt.yticks(
-        range(len(categories)),
-        categories
-    )
-
-    plt.xlabel("Hour of Day")
-    plt.ylabel("Activity Type")
-
-    plt.title(
-        "Security Activity Heatmap"
-    )
-
-    plt.colorbar(
-        label="Activity Density"
-    )
-
-    plt.tight_layout()
-
-    plt.savefig(
-        output,
-        dpi=180,
-        bbox_inches="tight"
-    )
-
-    plt.close()
-
-
-# ============================================================
-# CHART 6
-# RECORDING ACTIVITY BY HOUR
-# ============================================================
-
-def create_recording_chart(
-    selected_date,
-    recordings,
-    output
-):
-
-    hourly = [0] * 24
-
-    for recording in recordings or []:
-
-        if not isinstance(recording, dict):
-            continue
-
-        filename = recording.get(
-            "name",
-            ""
-        )
-
-        timestamp = parse_recording_time(
-            filename
-        )
-
-        if timestamp is None:
-            continue
-
-        if timestamp.strftime("%Y-%m-%d") != selected_date:
-            continue
-
-        hourly[timestamp.hour] += 1
-
-    plt.figure(
-        figsize=(10, 4)
-    )
-
-    plt.bar(
-        range(24),
-        hourly
-    )
-
-    plt.xticks(
-        range(24),
-        [f"{h:02d}" for h in range(24)],
-        fontsize=8
-    )
-
-    plt.xlabel("Hour of Day")
-    plt.ylabel("Recording Segments")
-
-    plt.title(
-        "Recording Activity by Hour"
-    )
-
-    plt.grid(
-        axis="y",
-        alpha=0.25
-    )
-
-    plt.tight_layout()
-
-    plt.savefig(
-        output,
-        dpi=180,
-        bbox_inches="tight"
-    )
-
-    plt.close()
-
-
-# ============================================================
-# OBSERVATIONS
-# ============================================================
-
-def generate_observations(
-    events,
-    recordings
-):
-
-    observations = []
-
-    if not events:
-
-        observations.append(
-            "No event data was available for the selected reporting period."
-        )
-
-        return observations
-
-    # --------------------------------------------------------
-    # PEAK HOUR
-    # --------------------------------------------------------
-
-    hourly = Counter(
-        event["datetime"].hour
-        for event in events
-    )
-
-    if hourly:
-
-        peak_hour, peak_count = (
-            hourly.most_common(1)[0]
-        )
-
-        observations.append(
-            f"Highest recorded activity occurred around "
-            f"{peak_hour:02d}:00, with {peak_count} "
-            f"recorded activity entries."
-        )
-
-    # --------------------------------------------------------
-    # UNKNOWN PERSON
-    # --------------------------------------------------------
-
-    unknown_count = sum(
-        1
-        for event in events
-        if event["category"] == "Unknown Person"
-    )
-
-    if unknown_count:
-
-        observations.append(
-            f"Unknown-person detections were recorded "
-            f"{unknown_count} time(s) during the reporting period."
-        )
-
-    # --------------------------------------------------------
-    # TAMPER
-    # --------------------------------------------------------
-
-    tamper_count = sum(
-        1
-        for event in events
-        if event["category"] == "Tamper"
-    )
-
-    if tamper_count:
-
-        observations.append(
-            f"Camera tamper activity was recorded "
-            f"{tamper_count} time(s)."
-        )
-
-    # --------------------------------------------------------
-    # KNOWN PEOPLE
-    # --------------------------------------------------------
-
-    people = Counter()
-
-    for event in events:
-
-        if (
-            event["category"] == "Known Person"
-            and event["person"]
-        ):
-            people[event["person"]] += 1
-
-    if people:
-
-        top_person, count = (
-            people.most_common(1)[0]
-        )
-
-        observations.append(
-            f"The highest-recognized-person activity "
-            f"was associated with {top_person}, "
-            f"with {count} recognition event(s)."
-        )
-
-    # --------------------------------------------------------
-    # RECORDINGS
-    # --------------------------------------------------------
-
-    if recordings:
-
-        observations.append(
-            f"{len(recordings)} recording file(s) were "
-            f"available in the recording repository."
-        )
-
-    return observations
-
-
-# ============================================================
-# PDF HEADER / FOOTER
-# ============================================================
-
-def add_page_number(canvas, doc):
+def draw_page(canvas, document):
 
     canvas.saveState()
 
+    width, height = A4
+
+    # Top bar
+    canvas.setFillColor(NAVY)
+
+    canvas.rect(
+        0,
+        height - 14 * mm,
+        width,
+        14 * mm,
+        fill=1,
+        stroke=0
+    )
+
+    canvas.setFillColor(WHITE)
+
     canvas.setFont(
-        "Helvetica",
-        8
+        "Helvetica-Bold",
+        10
     )
 
     canvas.drawString(
-        20 * mm,
-        10 * mm,
-        "SENTRIX — Intelligent Security Monitoring"
+        18 * mm,
+        height - 8.5 * mm,
+        "SENTRIX"
+    )
+
+    canvas.setFont(
+        "Helvetica",
+        7.5
     )
 
     canvas.drawRightString(
-        PAGE_WIDTH - 20 * mm,
-        10 * mm,
-        f"Page {doc.page}"
+        width - 18 * mm,
+        height - 8.5 * mm,
+        "AIoT SMART SURVEILLANCE SYSTEM"
+    )
+
+    # Footer line
+    canvas.setStrokeColor(GRAY_300)
+    canvas.setLineWidth(0.5)
+
+    canvas.line(
+        18 * mm,
+        12 * mm,
+        width - 18 * mm,
+        12 * mm
+    )
+
+    # Footer text
+    canvas.setFillColor(SECONDARY)
+
+    canvas.setFont(
+        "Helvetica",
+        7
+    )
+
+    canvas.drawString(
+        18 * mm,
+        7 * mm,
+        "SENTRIX • Automated Security Intelligence"
+    )
+
+    canvas.drawRightString(
+        width - 18 * mm,
+        7 * mm,
+        f"Page {document.page}"
     )
 
     canvas.restoreState()
 
 
 # ============================================================
-# MAIN REPORT GENERATOR
+# REPORT GENERATOR
 # ============================================================
 
 def generate_daily_report(
     selected_date,
-    current_events,
+    events,
     recordings
 ):
 
-    # --------------------------------------------------------
-    # PREPARE DATA
-    # --------------------------------------------------------
-
-    events = prepare_events(
-        selected_date,
-        current_events
-    )
-
-    # --------------------------------------------------------
-    # TEMP CHART DIRECTORY
-    # --------------------------------------------------------
-
-    chart_dir = tempfile.mkdtemp(
-        prefix="sentrix_report_"
-    )
-
-    chart_files = {}
-
-    chart_files["timeline"] = os.path.join(
-        chart_dir,
-        "activity_timeline.png"
-    )
-
-    chart_files["hourly"] = os.path.join(
-        chart_dir,
-        "hourly_activity.png"
-    )
-
-    chart_files["distribution"] = os.path.join(
-        chart_dir,
-        "event_distribution.png"
-    )
-
-    chart_files["people"] = os.path.join(
-        chart_dir,
-        "people_analysis.png"
-    )
-
-    chart_files["heatmap"] = os.path.join(
-        chart_dir,
-        "activity_heatmap.png"
-    )
-
-    chart_files["recording"] = os.path.join(
-        chart_dir,
-        "recording_activity.png"
-    )
-
-    # --------------------------------------------------------
-    # CREATE CHARTS
-    # --------------------------------------------------------
-
-    create_activity_timeline(
-        events,
-        chart_files["timeline"]
-    )
-
-    create_hourly_activity(
-        events,
-        chart_files["hourly"]
-    )
-
-    create_event_distribution(
-        events,
-        chart_files["distribution"]
-    )
-
-    create_people_chart(
-        events,
-        chart_files["people"]
-    )
-
-    create_activity_heatmap(
-        events,
-        chart_files["heatmap"]
-    )
-
-    create_recording_chart(
-        selected_date,
-        recordings,
-        chart_files["recording"]
-    )
-
-    # --------------------------------------------------------
-    # PDF PATH
-    # --------------------------------------------------------
-
-    output_file = os.path.join(
+    os.makedirs(
         REPORTS_FOLDER,
-        f"SENTRIX_Daily_Report_{selected_date}.pdf"
+        exist_ok=True
     )
 
-    # --------------------------------------------------------
-    # PDF DOCUMENT
-    # --------------------------------------------------------
+    filename = (
+        f"SENTRIX_Report_{selected_date}.pdf"
+    )
 
-    doc = SimpleDocTemplate(
-        output_file,
+    filepath = os.path.join(
+        REPORTS_FOLDER,
+        filename
+    )
+
+    # ========================================================
+    # FILTER RECORDINGS
+    # ========================================================
+
+    date_recordings = []
+
+    for recording in recordings:
+
+        name = recording.get(
+            "name",
+            ""
+        )
+
+        if selected_date in name:
+
+            date_recordings.append(
+                name
+            )
+
+    # ========================================================
+    # FILTER EVENTS (IN-MEMORY + FULL DATABASE HISTORY)
+    # ========================================================
+
+    date_events = []
+
+    for event in events:
+        event_text = str(event)
+        if selected_date in event_text:
+            date_events.append(event_text)
+
+    # Enrich with all events recorded in SQLite for selected_date
+    try:
+        db_events = get_events_by_date(selected_date)
+        existing_set = set(date_events)
+        for dbe in db_events:
+            ts = dbe.get("timestamp", "").replace("T", " ")
+            msg = dbe.get("message", "")
+            formatted = f"{ts} - {msg}"
+            if formatted not in existing_set:
+                date_events.append(formatted)
+                existing_set.add(formatted)
+    except Exception as exc:
+        print("Report generator database sync error:", exc)
+
+    # Sort chronologically
+    date_events.sort()
+
+    # ========================================================
+    # COUNTERS
+    # ========================================================
+
+    motion_count = 0
+    face_count = 0
+    unknown_count = 0
+    tamper_count = 0
+
+    camera_moved = 0
+    lens_covered = 0
+    camera_blurred = 0
+
+    siren_count = 0
+    object_missing_count = 0
+    object_missing_records = []
+
+    recognized_people = {}
+
+    # ========================================================
+    # ANALYZE EVENTS
+    # ========================================================
+
+    for event in date_events:
+
+        text = event.lower()
+
+        # Motion
+        if "motion detected" in text:
+            motion_count += 1
+
+        # Known face
+        if "recognized" in text:
+
+            face_count += 1
+
+            try:
+
+                if " - " in event:
+                    message = event.split(
+                        " - ",
+                        1
+                    )[1]
+                else:
+                    message = event
+
+                person = message.split(
+                    " recognized",
+                    1
+                )[0].strip()
+
+                if person:
+                    recognized_people[person] = (
+                        recognized_people.get(
+                            person,
+                            0
+                        ) + 1
+                    )
+
+            except Exception:
+                pass
+
+        # Unknown
+        if "unknown person" in text:
+            unknown_count += 1
+
+        # Tamper
+        if "tamper detected" in text:
+            tamper_count += 1
+
+        if "camera moved" in text:
+            camera_moved += 1
+
+        if "lens covered" in text:
+            lens_covered += 1
+
+        if "camera blurred" in text:
+            camera_blurred += 1
+
+        # Siren Deterrent Alarm
+        if "siren" in text:
+            siren_count += 1
+
+        # Monitored Object Missing Alerts
+        if "monitored object" in text or "missing alert" in text or "object_alert" in text:
+            object_missing_count += 1
+            ts = event.split(" - ")[0].strip() if " - " in event else ""
+            msg = event.split(" - ", 1)[1].strip() if " - " in event else event
+            object_missing_records.append({
+                "timestamp": ts,
+                "message": msg
+            })
+
+    # Fetch structured missing intervals from database
+    missing_intervals = []
+    try:
+        from app.database.db import get_missing_intervals
+        missing_intervals = get_missing_intervals(report_date)
+    except Exception:
+        missing_intervals = []
+
+    if missing_intervals:
+        object_missing_count = len(missing_intervals)
+
+    # ========================================================
+    # SECURITY STATUS
+    # ========================================================
+
+    if tamper_count > 0:
+
+        security_status = "ATTENTION REQUIRED"
+        status_color = RED
+        status_background = LIGHT_RED
+
+    elif unknown_count > 0:
+
+        security_status = "UNKNOWN ACTIVITY"
+        status_color = ORANGE
+        status_background = LIGHT_ORANGE
+
+    else:
+
+        security_status = "SYSTEM SECURE"
+        status_color = GREEN
+        status_background = LIGHT_GREEN
+
+    # ========================================================
+    # DOCUMENT
+    # ========================================================
+
+    document = SimpleDocTemplate(
+        filepath,
         pagesize=A4,
-        rightMargin=16 * mm,
-        leftMargin=16 * mm,
-        topMargin=15 * mm,
-        bottomMargin=16 * mm
+
+        rightMargin=18 * mm,
+        leftMargin=18 * mm,
+
+        topMargin=21 * mm,
+        bottomMargin=18 * mm,
+
+        title=f"SENTRIX Daily Security Report {selected_date}",
+
+        author="SENTRIX AIoT Smart Surveillance System"
     )
+
+    # ========================================================
+    # STYLES
+    # ========================================================
 
     styles = getSampleStyleSheet()
 
     title_style = ParagraphStyle(
-        "ReportTitle",
+        "SENTRIXTitle",
         parent=styles["Title"],
         fontName="Helvetica-Bold",
-        fontSize=21,
-        leading=25,
-        alignment=TA_CENTER,
-        spaceAfter=6
+        fontSize=26,
+        leading=30,
+        textColor=NAVY,
+        alignment=TA_LEFT,
+        spaceAfter=2
     )
 
     subtitle_style = ParagraphStyle(
-        "Subtitle",
+        "SENTRIXSubtitle",
         parent=styles["Normal"],
         fontName="Helvetica",
-        fontSize=10,
-        leading=14,
-        alignment=TA_CENTER,
-        spaceAfter=14
+        fontSize=9,
+        leading=13,
+        textColor=SECONDARY
     )
 
     section_style = ParagraphStyle(
         "Section",
         parent=styles["Heading2"],
         fontName="Helvetica-Bold",
-        fontSize=15,
-        leading=19,
-        spaceBefore=4,
-        spaceAfter=8
+        fontSize=13,
+        leading=16,
+        textColor=NAVY,
+        spaceBefore=5,
+        spaceAfter=7
     )
 
-    body_style = ParagraphStyle(
-        "Body",
-        parent=styles["BodyText"],
+    normal_style = ParagraphStyle(
+        "NormalCustom",
+        parent=styles["Normal"],
         fontName="Helvetica",
-        fontSize=9.5,
-        leading=14,
-        spaceAfter=6
+        fontSize=8.8,
+        leading=12.5,
+        textColor=TEXT
     )
 
     small_style = ParagraphStyle(
         "Small",
-        parent=styles["BodyText"],
+        parent=styles["Normal"],
         fontName="Helvetica",
-        fontSize=8,
-        leading=11
+        fontSize=7.5,
+        leading=10,
+        textColor=SECONDARY
     )
 
-    # --------------------------------------------------------
+    center_style = ParagraphStyle(
+        "Center",
+        parent=normal_style,
+        alignment=TA_CENTER
+    )
+
+    white_left_style = ParagraphStyle(
+        "WhiteLeft",
+        parent=styles["Normal"],
+        fontName="Helvetica-Bold",
+        fontSize=8,
+        leading=10,
+        textColor=WHITE,
+        alignment=TA_LEFT
+    )
+
+    white_center_style = ParagraphStyle(
+        "WhiteCenter",
+        parent=styles["Normal"],
+        fontName="Helvetica-Bold",
+        fontSize=8,
+        leading=10,
+        textColor=WHITE,
+        alignment=TA_CENTER
+    )
+
+    metric_number_style = ParagraphStyle(
+        "MetricNumber",
+        parent=styles["Normal"],
+        fontName="Helvetica-Bold",
+        fontSize=20,
+        leading=22,
+        textColor=NAVY,
+        alignment=TA_CENTER
+    )
+
+    metric_label_style = ParagraphStyle(
+        "MetricLabel",
+        parent=styles["Normal"],
+        fontName="Helvetica-Bold",
+        fontSize=7,
+        leading=9,
+        textColor=SECONDARY,
+        alignment=TA_CENTER
+    )
+
+    status_title_style = ParagraphStyle(
+        "StatusTitle",
+        parent=styles["Normal"],
+        fontName="Helvetica-Bold",
+        fontSize=8,
+        leading=10,
+        textColor=SECONDARY
+    )
+
+    status_value_style = ParagraphStyle(
+        "StatusValue",
+        parent=styles["Normal"],
+        fontName="Helvetica-Bold",
+        fontSize=11,
+        leading=13,
+        textColor=status_color,
+        alignment=TA_CENTER
+    )
+
+    # ========================================================
     # STORY
-    # --------------------------------------------------------
+    # ========================================================
 
     story = []
 
     # ========================================================
-    # COVER / OVERVIEW
+    # TITLE
     # ========================================================
 
     story.append(
-        Spacer(1, 10 * mm)
+        Spacer(
+            1,
+            5 * mm
+        )
     )
 
     story.append(
@@ -987,148 +515,909 @@ def generate_daily_report(
 
     story.append(
         Paragraph(
-            "Intelligent Security Monitoring Report",
+            "DAILY SECURITY INTELLIGENCE REPORT",
             subtitle_style
         )
     )
 
     story.append(
-        Paragraph(
-            f"Reporting Date: <b>{selected_date}</b>",
-            subtitle_style
+        Spacer(
+            1,
+            5 * mm
         )
-    )
-
-    story.append(
-        Spacer(1, 4 * mm)
-    )
-
-    story.append(
-        Paragraph(
-            "SECURITY ACTIVITY OVERVIEW",
-            section_style
-        )
-    )
-
-    story.append(
-        Paragraph(
-            "This report presents a visual analysis of the "
-            "security activity recorded by SENTRIX during "
-            "the selected reporting period. Instead of "
-            "listing individual events, activity is grouped "
-            "by time, event type, human presence and recording "
-            "behaviour.",
-            body_style
-        )
-    )
-
-    story.append(
-        Spacer(1, 3 * mm)
-    )
-
-    # --------------------------------------------------------
-    # TIMELINE
-    # --------------------------------------------------------
-
-    story.append(
-        Image(
-            chart_files["timeline"],
-            width=175 * mm,
-            height=74 * mm
-        )
-    )
-
-    story.append(
-        Spacer(1, 3 * mm)
-    )
-
-    story.append(
-        Paragraph(
-            "The timeline shows how detected activity "
-            "changed throughout the day and helps identify "
-            "periods of increased surveillance activity.",
-            small_style
-        )
-    )
-
-    story.append(
-        Spacer(1, 6 * mm)
-    )
-
-    # --------------------------------------------------------
-    # HOURLY ACTIVITY
-    # --------------------------------------------------------
-
-    story.append(
-        Paragraph(
-            "HOURLY SECURITY ACTIVITY",
-            section_style
-        )
-    )
-
-    story.append(
-        Image(
-            chart_files["hourly"],
-            width=175 * mm,
-            height=78 * mm
-        )
-    )
-
-    story.append(
-        PageBreak()
     )
 
     # ========================================================
-    # BEHAVIOUR ANALYSIS
+    # REPORT INFORMATION
     # ========================================================
 
+    generated_time = datetime.now().strftime(
+        "%d %B %Y • %I:%M:%S %p"
+    )
+
+    info_data = [
+        [
+            Paragraph(
+                "<b>REPORT DATE</b><br/>"
+                f"{selected_date}",
+                normal_style
+            ),
+
+            Paragraph(
+                "<b>GENERATED</b><br/>"
+                f"{generated_time}",
+                normal_style
+            ),
+
+            Paragraph(
+                "<b>PLATFORM</b><br/>"
+                "SENTRIX AIoT",
+                normal_style
+            )
+        ]
+    ]
+
+    info_table = Table(
+        info_data,
+        colWidths=[
+            55 * mm,
+            65 * mm,
+            55 * mm
+        ]
+    )
+
+    info_table.setStyle(
+        TableStyle([
+            (
+                "BACKGROUND",
+                (0, 0),
+                (-1, -1),
+                GRAY_50
+            ),
+            (
+                "BOX",
+                (0, 0),
+                (-1, -1),
+                0.6,
+                GRAY_300
+            ),
+            (
+                "INNERGRID",
+                (0, 0),
+                (-1, -1),
+                0.4,
+                GRAY_200
+            ),
+            (
+                "VALIGN",
+                (0, 0),
+                (-1, -1),
+                "MIDDLE"
+            ),
+            (
+                "LEFTPADDING",
+                (0, 0),
+                (-1, -1),
+                9
+            ),
+            (
+                "RIGHTPADDING",
+                (0, 0),
+                (-1, -1),
+                9
+            ),
+            (
+                "TOPPADDING",
+                (0, 0),
+                (-1, -1),
+                7
+            ),
+            (
+                "BOTTOMPADDING",
+                (0, 0),
+                (-1, -1),
+                7
+            )
+        ])
+    )
+
+    story.append(info_table)
+
     story.append(
-        Paragraph(
-            "BEHAVIOUR & PRESENCE ANALYSIS",
-            section_style
+        Spacer(
+            1,
+            5 * mm
         )
     )
 
-    story.append(
-        Paragraph(
-            "SENTRIX separates general motion activity from "
-            "face-recognition and camera-security events. "
-            "This makes it easier to understand what type of "
-            "activity contributed to the observed surveillance "
-            "pattern.",
-            body_style
-        )
-    )
+    # ========================================================
+    # SECURITY STATUS
+    # ========================================================
 
-    # --------------------------------------------------------
-    # DISTRIBUTION + PEOPLE
-    # --------------------------------------------------------
-
-    table = Table(
+    status_table = Table(
         [
             [
-                Image(
-                    chart_files["distribution"],
-                    width=85 * mm,
-                    height=60 * mm
+                Paragraph(
+                    "CURRENT SECURITY STATUS",
+                    status_title_style
                 ),
-
-                Image(
-                    chart_files["people"],
-                    width=85 * mm,
-                    height=60 * mm
+                Paragraph(
+                    security_status,
+                    status_value_style
                 )
             ]
         ],
         colWidths=[
-            88 * mm,
-            88 * mm
+            90 * mm,
+            85 * mm
         ]
     )
 
-    table.setStyle(
-        TableStyle(
+    status_table.setStyle(
+        TableStyle([
+            (
+                "BACKGROUND",
+                (0, 0),
+                (-1, -1),
+                status_background
+            ),
+            (
+                "BOX",
+                (0, 0),
+                (-1, -1),
+                1,
+                status_color
+            ),
+            (
+                "VALIGN",
+                (0, 0),
+                (-1, -1),
+                "MIDDLE"
+            ),
+            (
+                "LEFTPADDING",
+                (0, 0),
+                (-1, -1),
+                10
+            ),
+            (
+                "RIGHTPADDING",
+                (0, 0),
+                (-1, -1),
+                10
+            ),
+            (
+                "TOPPADDING",
+                (0, 0),
+                (-1, -1),
+                8
+            ),
+            (
+                "BOTTOMPADDING",
+                (0, 0),
+                (-1, -1),
+                8
+            )
+        ])
+    )
+
+    story.append(status_table)
+
+    story.append(
+        Spacer(
+            1,
+            6 * mm
+        )
+    )
+
+    # ========================================================
+    # SECURITY OVERVIEW
+    # ========================================================
+
+    story.append(
+        Paragraph(
+            "Security Overview",
+            section_style
+        )
+    )
+
+    metrics = [
+        (motion_count, "MOTION EVENTS"),
+        (len(date_recordings), "RECORDINGS"),
+        (face_count, "KNOWN FACES"),
+        (unknown_count, "UNKNOWN"),
+        (tamper_count, "TAMPER")
+    ]
+
+    metric_cells = []
+
+    for value, label in metrics:
+
+        metric_cells.append(
             [
+                Paragraph(
+                    str(value),
+                    metric_number_style
+                ),
+                Paragraph(
+                    label,
+                    metric_label_style
+                )
+            ]
+        )
+
+    metric_table = Table(
+        [metric_cells],
+        colWidths=[
+            35 * mm,
+            35 * mm,
+            35 * mm,
+            35 * mm,
+            35 * mm
+        ],
+        rowHeights=[
+            27 * mm
+        ]
+    )
+
+    metric_table.setStyle(
+        TableStyle([
+            (
+                "BACKGROUND",
+                (0, 0),
+                (-1, -1),
+                WHITE
+            ),
+            (
+                "BOX",
+                (0, 0),
+                (-1, -1),
+                0.6,
+                GRAY_300
+            ),
+            (
+                "INNERGRID",
+                (0, 0),
+                (-1, -1),
+                0.5,
+                GRAY_200
+            ),
+            (
+                "VALIGN",
+                (0, 0),
+                (-1, -1),
+                "MIDDLE"
+            )
+        ])
+    )
+
+    story.append(metric_table)
+
+    story.append(
+        Spacer(
+            1,
+            6 * mm
+        )
+    )
+
+    # ========================================================
+    # VISUAL SECURITY ANALYTICS (EXAMINER RECOMMENDATION)
+    # ========================================================
+
+    story.append(
+        Paragraph(
+            "Visual Security Analytics",
+            section_style
+        )
+    )
+
+    temp_chart_dir = tempfile.mkdtemp(prefix="sentrix_charts_")
+    try:
+        donut_chart_path = os.path.join(temp_chart_dir, "event_dist.png")
+        incidents_chart_path = os.path.join(temp_chart_dir, "incidents.png")
+
+        # Distribution dictionary
+        dist_dict = {
+            "motion": motion_count,
+            "face_recognized": face_count,
+            "unknown_person": unknown_count,
+            "tamper": tamper_count,
+            "siren_alarm": siren_count,
+            "object_missing": object_missing_count
+        }
+
+        # Incidents dictionary
+        incidents_dict = {
+            "CAMERA MOVED": camera_moved,
+            "LENS COVERED": lens_covered,
+            "CAMERA BLURRED": camera_blurred,
+            "SIREN ALARM": siren_count,
+            "OBJECT MISSING": object_missing_count
+        }
+
+        report_visualizer.generate_event_distribution_chart(dist_dict, output_path=donut_chart_path)
+        report_visualizer.generate_security_incidents_chart(incidents_dict, output_path=incidents_chart_path)
+
+        # Place the two side-by-side charts
+        chart_table = Table(
+            [
+                [
+                    Image(donut_chart_path, width=86 * mm, height=58 * mm),
+                    Image(incidents_chart_path, width=86 * mm, height=58 * mm)
+                ]
+            ],
+            colWidths=[87.5 * mm, 87.5 * mm]
+        )
+        chart_table.setStyle(TableStyle([
+            ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+            ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+            ("LEFTPADDING", (0, 0), (-1, -1), 0),
+            ("RIGHTPADDING", (0, 0), (-1, -1), 0),
+            ("TOPPADDING", (0, 0), (-1, -1), 0),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 0),
+        ]))
+        story.append(chart_table)
+
+    except Exception as chart_err:
+        print("Visual analytics chart generation error:", chart_err)
+
+    story.append(
+        Spacer(
+            1,
+            6 * mm
+        )
+    )
+
+    story.append(PageBreak())
+
+    # ========================================================
+    # FACE RECOGNITION
+    # ========================================================
+
+    story.append(
+        Paragraph(
+            "Face Recognition Analysis",
+            section_style
+        )
+    )
+
+    people_data = [
+        [
+            Paragraph(
+                "PERSON",
+                white_left_style
+            ),
+            Paragraph(
+                "DETECTIONS",
+                white_center_style
+            ),
+            Paragraph(
+                "STATUS",
+                white_center_style
+            )
+        ]
+    ]
+
+    for person, count in sorted(
+        recognized_people.items()
+    ):
+
+        people_data.append(
+            [
+                Paragraph(
+                    person,
+                    normal_style
+                ),
+                Paragraph(
+                    str(count),
+                    center_style
+                ),
+                Paragraph(
+                    "RECOGNIZED",
+                    ParagraphStyle(
+                        "RecognizedStatus",
+                        parent=small_style,
+                        fontName="Helvetica-Bold",
+                        textColor=GREEN,
+                        alignment=TA_CENTER
+                    )
+                )
+            ]
+        )
+
+    if unknown_count > 0:
+
+        people_data.append(
+            [
+                Paragraph(
+                    "Unknown Person",
+                    normal_style
+                ),
+                Paragraph(
+                    str(unknown_count),
+                    center_style
+                ),
+                Paragraph(
+                    "ALERT",
+                    ParagraphStyle(
+                        "UnknownStatus",
+                        parent=small_style,
+                        fontName="Helvetica-Bold",
+                        textColor=RED,
+                        alignment=TA_CENTER
+                    )
+                )
+            ]
+        )
+
+    if len(people_data) == 1:
+
+        people_data.append(
+            [
+                Paragraph(
+                    "No persons recognized",
+                    small_style
+                ),
+                Paragraph(
+                    "0",
+                    center_style
+                ),
+                Paragraph(
+                    "NO DATA",
+                    small_style
+                )
+            ]
+        )
+
+    people_table = Table(
+        people_data,
+        colWidths=[
+            90 * mm,
+            35 * mm,
+            50 * mm
+        ],
+        repeatRows=1
+    )
+
+    people_table.setStyle(
+        TableStyle([
+            (
+                "BACKGROUND",
+                (0, 0),
+                (-1, 0),
+                NAVY
+            ),
+            (
+                "TEXTCOLOR",
+                (0, 0),
+                (-1, 0),
+                WHITE
+            ),
+            (
+                "GRID",
+                (0, 0),
+                (-1, -1),
+                0.5,
+                GRAY_300
+            ),
+            (
+                "ROWBACKGROUNDS",
+                (0, 1),
+                (-1, -1),
+                [
+                    WHITE,
+                    GRAY_50
+                ]
+            ),
+            (
+                "VALIGN",
+                (0, 0),
+                (-1, -1),
+                "MIDDLE"
+            ),
+            (
+                "TOPPADDING",
+                (0, 0),
+                (-1, -1),
+                7
+            ),
+            (
+                "BOTTOMPADDING",
+                (0, 0),
+                (-1, -1),
+                7
+            )
+        ])
+    )
+
+    story.append(people_table)
+
+    story.append(
+        Spacer(
+            1,
+            6 * mm
+        )
+    )
+
+    # ========================================================
+    # TAMPER ANALYSIS
+    # ========================================================
+
+    story.append(
+        Paragraph(
+            "Camera Integrity & Tamper Analysis",
+            section_style
+        )
+    )
+
+    tamper_data = [
+        [
+            Paragraph(
+                "INCIDENT TYPE",
+                white_left_style
+            ),
+            Paragraph(
+                "OCCURRENCES",
+                white_center_style
+            ),
+            Paragraph(
+                "STATUS",
+                white_center_style
+            )
+        ],
+        [
+            Paragraph(
+                "Camera Moved",
+                normal_style
+            ),
+            Paragraph(
+                str(camera_moved),
+                center_style
+            ),
+            Paragraph(
+                "ALERT" if camera_moved else "CLEAR",
+                ParagraphStyle(
+                    "MovedStatus",
+                    parent=small_style,
+                    fontName="Helvetica-Bold",
+                    textColor=RED if camera_moved else GREEN,
+                    alignment=TA_CENTER
+                )
+            )
+        ],
+        [
+            Paragraph(
+                "Lens Covered",
+                normal_style
+            ),
+            Paragraph(
+                str(lens_covered),
+                center_style
+            ),
+            Paragraph(
+                "ALERT" if lens_covered else "CLEAR",
+                ParagraphStyle(
+                    "CoveredStatus",
+                    parent=small_style,
+                    fontName="Helvetica-Bold",
+                    textColor=RED if lens_covered else GREEN,
+                    alignment=TA_CENTER
+                )
+            )
+        ],
+        [
+            Paragraph(
+                "Camera Blurred",
+                normal_style
+            ),
+            Paragraph(
+                str(camera_blurred),
+                center_style
+            ),
+            Paragraph(
+                "ALERT" if camera_blurred else "CLEAR",
+                ParagraphStyle(
+                    "BlurStatus",
+                    parent=small_style,
+                    fontName="Helvetica-Bold",
+                    textColor=RED if camera_blurred else GREEN,
+                    alignment=TA_CENTER
+                )
+            )
+        ]
+    ]
+
+    tamper_table = Table(
+        tamper_data,
+        colWidths=[
+            85 * mm,
+            40 * mm,
+            50 * mm
+        ],
+        repeatRows=1
+    )
+
+    tamper_table.setStyle(
+        TableStyle([
+            (
+                "BACKGROUND",
+                (0, 0),
+                (-1, 0),
+                NAVY
+            ),
+            (
+                "TEXTCOLOR",
+                (0, 0),
+                (-1, 0),
+                WHITE
+            ),
+            (
+                "GRID",
+                (0, 0),
+                (-1, -1),
+                0.5,
+                GRAY_300
+            ),
+            (
+                "ROWBACKGROUNDS",
+                (0, 1),
+                (-1, -1),
+                [
+                    WHITE,
+                    GRAY_50
+                ]
+            ),
+            (
+                "VALIGN",
+                (0, 0),
+                (-1, -1),
+                "MIDDLE"
+            ),
+            (
+                "TOPPADDING",
+                (0, 0),
+                (-1, -1),
+                7
+            ),
+            (
+                "BOTTOMPADDING",
+                (0, 0),
+                (-1, -1),
+                7
+            )
+        ])
+    )
+
+    story.append(tamper_table)
+
+    story.append(
+        Spacer(
+            1,
+            6 * mm
+        )
+    )
+
+    # ========================================================
+    # MONITORED ASSET & MISSING OBJECT TIMELINE
+    # ========================================================
+
+    story.append(
+        Paragraph(
+            "Monitored Asset & Missing Object Timeline",
+            section_style
+        )
+    )
+
+    story.append(
+        Paragraph(
+            "Detailed log indicating exact timestamps when the monitored object was absent or missing from camera view.",
+            ParagraphStyle("SubTextObj", parent=styles["Normal"], fontSize=8.5, textColor=SECONDARY, spaceAfter=8)
+        )
+    )
+
+    if missing_intervals:
+        obj_table_data = [
+            [
+                Paragraph("#", white_center_style),
+                Paragraph("MONITORED ASSET", white_left_style),
+                Paragraph("TIME PERIOD (FROM - TO)", white_left_style),
+                Paragraph("DURATION MISSING", white_center_style),
+                Paragraph("STATUS", white_center_style)
+            ]
+        ]
+
+        for idx, inter in enumerate(missing_intervals[:30], start=1):
+            asset_title = inter.get("asset_name") or "Monitored Asset"
+            start_t = inter.get("start_time") or "N/A"
+            end_t = inter.get("end_time")
+            dur_str = inter.get("duration_str") or (f"{inter.get('duration_seconds', 0)}s" if inter.get("duration_seconds") else "Ongoing")
+            status = inter.get("status", "CURRENTLY MISSING")
+
+            if end_t:
+                time_range = f"<b>{start_t}</b><br/>to <b>{end_t}</b>"
+            else:
+                time_range = f"<b>{start_t}</b><br/><font color='#DC2626'>to Ongoing</font>"
+
+            if status == "RESTORED":
+                status_html = "<font color='#059669'><b>RESTORED</b></font>"
+            else:
+                status_html = "<font color='#DC2626'><b>CURRENTLY MISSING</b></font>"
+
+            obj_table_data.append([
+                Paragraph(str(idx), center_style),
+                Paragraph(f"<b>{asset_title}</b>", small_style),
+                Paragraph(time_range, small_style),
+                Paragraph(dur_str, center_style),
+                Paragraph(status_html, center_style)
+            ])
+
+        obj_table = Table(
+            obj_table_data,
+            colWidths=[12 * mm, 40 * mm, 62 * mm, 33 * mm, 28 * mm]
+        )
+        obj_table.setStyle(
+            TableStyle([
+                ("BACKGROUND", (0, 0), (-1, 0), NAVY),
+                ("ALIGN", (0, 0), (-1, 0), "LEFT"),
+                ("ALIGN", (0, 0), (0, -1), "CENTER"),
+                ("ALIGN", (3, 1), (4, -1), "CENTER"),
+                ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+                ("GRID", (0, 0), (-1, -1), 0.5, GRAY_300),
+                ("ROWBACKGROUNDS", (0, 1), (-1, -1), [WHITE, GRAY_50]),
+                ("TOPPADDING", (0, 0), (-1, -1), 5),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
+            ])
+        )
+        story.append(obj_table)
+    elif object_missing_records:
+        obj_table_data = [
+            [
+                Paragraph("#", white_center_style),
+                Paragraph("TIMESTAMP (WHEN MISSING)", white_left_style),
+                Paragraph("MONITORED ASSET", white_left_style),
+                Paragraph("STATUS", white_center_style),
+                Paragraph("INCIDENT DETAILS", white_left_style)
+            ]
+        ]
+
+        for idx, rec in enumerate(object_missing_records[:25], start=1):
+            ts_text = rec.get("timestamp", "N/A")
+            obj_table_data.append([
+                Paragraph(str(idx), center_style),
+                Paragraph(f"<b>{ts_text}</b>", small_style),
+                Paragraph("Monitored Asset", small_style),
+                Paragraph("<font color='#DC2626'><b>MISSING ALERT</b></font>", center_style),
+                Paragraph("Asset absent / not detected in camera view", small_style)
+            ])
+
+        obj_table = Table(
+            obj_table_data,
+            colWidths=[12 * mm, 45 * mm, 35 * mm, 35 * mm, 48 * mm]
+        )
+        obj_table.setStyle(
+            TableStyle([
+                ("BACKGROUND", (0, 0), (-1, 0), NAVY),
+                ("ALIGN", (0, 0), (-1, 0), "LEFT"),
+                ("ALIGN", (0, 0), (0, -1), "CENTER"),
+                ("ALIGN", (3, 1), (3, -1), "CENTER"),
+                ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+                ("GRID", (0, 0), (-1, -1), 0.5, GRAY_300),
+                ("ROWBACKGROUNDS", (0, 1), (-1, -1), [WHITE, GRAY_50]),
+                ("TOPPADDING", (0, 0), (-1, -1), 5),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
+            ])
+        )
+        story.append(obj_table)
+    else:
+        clean_box = Table(
+            [[
+                Paragraph(
+                    "<b>Monitored Asset Integrity:</b> All monitored assets remained securely in camera view throughout surveillance with <b>0 missing incidents</b> on this date.",
+                    ParagraphStyle("CleanMsg", parent=styles["Normal"], fontSize=9.5, textColor=TEXT)
+                )
+            ]],
+            colWidths=[175 * mm]
+        )
+        clean_box.setStyle(TableStyle([
+            ("BACKGROUND", (0, 0), (-1, -1), LIGHT_GREEN),
+            ("BOX", (0, 0), (-1, -1), 1, GREEN),
+            ("TOPPADDING", (0, 0), (-1, -1), 8),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 8),
+            ("LEFTPADDING", (0, 0), (-1, -1), 12),
+            ("RIGHTPADDING", (0, 0), (-1, -1), 12),
+        ]))
+        story.append(clean_box)
+
+    story.append(
+        Spacer(
+            1,
+            6 * mm
+        )
+    )
+
+    # ========================================================
+    # VIDEO EVIDENCE
+    # ========================================================
+
+    story.append(
+        Paragraph(
+            "Video Evidence",
+            section_style
+        )
+    )
+
+    if date_recordings:
+
+        recording_data = [
+            [
+                Paragraph(
+                    "#",
+                    white_center_style
+                ),
+                Paragraph(
+                    "RECORDING FILE",
+                    white_left_style
+                )
+            ]
+        ]
+
+        for index, recording in enumerate(
+            date_recordings,
+            start=1
+        ):
+
+            recording_data.append(
+                [
+                    Paragraph(
+                        str(index),
+                        center_style
+                    ),
+                    Paragraph(
+                        recording,
+                        normal_style
+                    )
+                ]
+            )
+
+        recording_table = Table(
+            recording_data,
+            colWidths=[
+                15 * mm,
+                160 * mm
+            ],
+            repeatRows=1
+        )
+
+        recording_table.setStyle(
+            TableStyle([
+                (
+                    "BACKGROUND",
+                    (0, 0),
+                    (-1, 0),
+                    DARK_BLUE
+                ),
+                (
+                    "TEXTCOLOR",
+                    (0, 0),
+                    (-1, 0),
+                    WHITE
+                ),
+                (
+                    "GRID",
+                    (0, 0),
+                    (-1, -1),
+                    0.5,
+                    GRAY_300
+                ),
+                (
+                    "ROWBACKGROUNDS",
+                    (0, 1),
+                    (-1, -1),
+                    [
+                        WHITE,
+                        GRAY_50
+                    ]
+                ),
                 (
                     "VALIGN",
                     (0, 0),
@@ -1136,266 +1425,128 @@ def generate_daily_report(
                     "MIDDLE"
                 ),
                 (
-                    "ALIGN",
+                    "TOPPADDING",
                     (0, 0),
                     (-1, -1),
-                    "CENTER"
-                )
-            ]
-        )
-    )
-
-    story.append(
-        table
-    )
-
-    story.append(
-        Spacer(1, 6 * mm)
-    )
-
-    story.append(
-        Paragraph(
-            "The distribution chart summarizes the relative "
-            "share of detected activity categories, while "
-            "the human-presence chart shows recognition "
-            "activity associated with known and unknown "
-            "persons.",
-            small_style
-        )
-    )
-
-    story.append(
-        Spacer(1, 5 * mm)
-    )
-
-    # --------------------------------------------------------
-    # HEATMAP
-    # --------------------------------------------------------
-
-    story.append(
-        Paragraph(
-            "SECURITY ACTIVITY HEATMAP",
-            section_style
-        )
-    )
-
-    story.append(
-        Image(
-            chart_files["heatmap"],
-            width=175 * mm,
-            height=72 * mm
-        )
-    )
-
-    story.append(
-        Paragraph(
-            "The heatmap represents the concentration of "
-            "different security activities across the 24-hour "
-            "period. Darker regions indicate higher activity "
-            "density within the plotted data.",
-            small_style
-        )
-    )
-
-    story.append(
-        PageBreak()
-    )
-
-    # ========================================================
-    # RECORDING ANALYSIS
-    # ========================================================
-
-    story.append(
-        Paragraph(
-            "RECORDING & SECURITY ANALYSIS",
-            section_style
-        )
-    )
-
-    story.append(
-        Paragraph(
-            "Recording activity is shown by hour rather than "
-            "listing every individual recording file. This "
-            "provides a clearer representation of when the "
-            "surveillance system was actively creating "
-            "recordings.",
-            body_style
-        )
-    )
-
-    story.append(
-        Image(
-            chart_files["recording"],
-            width=175 * mm,
-            height=70 * mm
-        )
-    )
-
-    story.append(
-        Spacer(1, 5 * mm)
-    )
-
-    # ========================================================
-    # ANALYTICAL OBSERVATIONS
-    # ========================================================
-
-    story.append(
-        Paragraph(
-            "ANALYTICAL OBSERVATIONS",
-            section_style
-        )
-    )
-
-    observations = generate_observations(
-        events,
-        recordings
-    )
-
-    observation_rows = []
-
-    for index, observation in enumerate(
-        observations,
-        start=1
-    ):
-
-        observation_rows.append(
-            [
-                Paragraph(
-                    f"<b>{index}</b>",
-                    body_style
+                    6
                 ),
-                Paragraph(
-                    observation,
-                    body_style
+                (
+                    "BOTTOMPADDING",
+                    (0, 0),
+                    (-1, -1),
+                    6
                 )
-            ]
+            ])
         )
 
-    if observation_rows:
+        story.append(recording_table)
 
-        observation_table = Table(
-            observation_rows,
-            colWidths=[
-                12 * mm,
-                163 * mm
-            ]
-        )
+    else:
 
-        observation_table.setStyle(
-            TableStyle(
-                [
-                    (
-                        "VALIGN",
-                        (0, 0),
-                        (-1, -1),
-                        "TOP"
-                    ),
-                    (
-                        "LINEBELOW",
-                        (0, 0),
-                        (-1, -1),
-                        0.3,
-                        colors.lightgrey
-                    ),
-                    (
-                        "LEFTPADDING",
-                        (0, 0),
-                        (-1, -1),
-                        5
-                    ),
-                    (
-                        "RIGHTPADDING",
-                        (0, 0),
-                        (-1, -1),
-                        5
-                    ),
-                    (
-                        "TOPPADDING",
-                        (0, 0),
-                        (-1, -1),
-                        5
-                    ),
-                    (
-                        "BOTTOMPADDING",
-                        (0, 0),
-                        (-1, -1),
-                        5
-                    )
-                ]
+        story.append(
+            Paragraph(
+                "No video recordings were generated for this date.",
+                small_style
             )
         )
 
-        story.append(
-            observation_table
-        )
-
     story.append(
-        Spacer(1, 7 * mm)
+        Spacer(
+            1,
+            6 * mm
+        )
     )
 
     # ========================================================
-    # REPORT METHODOLOGY
+    # REPORT NOTE
     # ========================================================
 
     story.append(
-        Paragraph(
-            "REPORT METHODOLOGY",
-            section_style
+        Spacer(
+            1,
+            8 * mm
         )
     )
 
-    story.append(
-        Paragraph(
-            "The report groups surveillance events into "
-            "time-based and activity-based categories. "
-            "Motion, face recognition, unknown-person "
-            "detection and tamper events are represented "
-            "through visual summaries. Individual event "
-            "messages are intentionally omitted from the "
-            "main report to reduce repetitive information "
-            "and improve analytical readability.",
-            body_style
-        )
+    note_table = Table(
+        [
+            [
+                Paragraph(
+                    "<b>SENTRIX REPORT NOTE</b><br/>"
+                    "This report was automatically generated by "
+                    "the SENTRIX AIoT Smart Surveillance System. "
+                    "It summarizes motion detection, facial "
+                    "recognition, video recording and camera "
+                    "integrity events captured during the "
+                    "selected date.",
+                    small_style
+                )
+            ]
+        ],
+        colWidths=[
+            175 * mm
+        ]
     )
 
-    story.append(
-        Paragraph(
-            "SENTRIX Daily Security Report • "
-            f"Generated on {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
-            small_style
-        )
+    note_table.setStyle(
+        TableStyle([
+            (
+                "BACKGROUND",
+                (0, 0),
+                (-1, -1),
+                LIGHT_BLUE
+            ),
+            (
+                "BOX",
+                (0, 0),
+                (-1, -1),
+                0.7,
+                BLUE
+            ),
+            (
+                "LEFTPADDING",
+                (0, 0),
+                (-1, -1),
+                10
+            ),
+            (
+                "RIGHTPADDING",
+                (0, 0),
+                (-1, -1),
+                10
+            ),
+            (
+                "TOPPADDING",
+                (0, 0),
+                (-1, -1),
+                9
+            ),
+            (
+                "BOTTOMPADDING",
+                (0, 0),
+                (-1, -1),
+                9
+            )
+        ])
     )
+
+    story.append(note_table)
 
     # ========================================================
     # BUILD PDF
     # ========================================================
 
-    doc.build(
-        story,
-        onFirstPage=add_page_number,
-        onLaterPages=add_page_number
-    )
-
-    # --------------------------------------------------------
-    # CLEAN TEMP FILES
-    # --------------------------------------------------------
-
     try:
+        document.build(
+            story,
+            onFirstPage=draw_page,
+            onLaterPages=draw_page
+        )
+    finally:
+        try:
+            if 'temp_chart_dir' in locals() and os.path.isdir(temp_chart_dir):
+                shutil.rmtree(temp_chart_dir, ignore_errors=True)
+        except Exception:
+            pass
 
-        for filename in os.listdir(chart_dir):
-
-            filepath = os.path.join(
-                chart_dir,
-                filename
-            )
-
-            if os.path.isfile(filepath):
-
-                os.remove(filepath)
-
-        os.rmdir(chart_dir)
-
-    except Exception:
-        pass
-
-    return output_file
+    return filepath

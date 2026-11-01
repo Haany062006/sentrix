@@ -1,620 +1,144 @@
+"""Face embedding loading and recognition for SentriX.
+
+Input contract: face_image must be an RGB image (as returned by MTCNN's
+RGB-frame crop). Registered pickle files are read only; this module never
+rewrites or deletes them.
+"""
 import os
 import pickle
-
 import cv2
 import numpy as np
 
-from mtcnn import MTCNN
-from keras_facenet import FaceNet
-
-
-# ============================================================
-# SETTINGS
-# ============================================================
-
 REGISTERED_FOLDER = "registered_faces"
-
-# Starting threshold.
-# We will tune this after seeing the actual similarity scores.
 RECOGNITION_THRESHOLD = 0.60
 
 
-# ============================================================
-# LOAD REGISTERED FACES
-# ============================================================
+def _normalize_rows(values):
+    values = np.asarray(values, dtype=np.float32)
+    if values.ndim == 1:
+        values = values.reshape(1, -1)
+    norms = np.linalg.norm(values, axis=1, keepdims=True)
+    return values / np.maximum(norms, 1e-10)
+
 
 def load_registered_faces():
-
     registered_faces = {}
-
-    if not os.path.exists(REGISTERED_FOLDER):
-
+    if not os.path.isdir(REGISTERED_FOLDER):
         print("ERROR: registered_faces folder not found.")
-
         return registered_faces
 
     for filename in os.listdir(REGISTERED_FOLDER):
-
-        if not filename.endswith(".pkl"):
+        if not filename.lower().endswith(".pkl"):
             continue
-
-        filepath = os.path.join(
-            REGISTERED_FOLDER,
-            filename
-        )
-
+        filepath = os.path.join(REGISTERED_FOLDER, filename)
         try:
-
-            with open(
-                filepath,
-                "rb"
-            ) as file:
-
+            with open(filepath, "rb") as file:
                 data = pickle.load(file)
-
-            # ------------------------------------------------
-            # CHECK NAME
-            # ------------------------------------------------
-
             name = data["name"]
-
-            # ------------------------------------------------
-            # NEW FORMAT
-            # ------------------------------------------------
-
             if "embeddings" in data:
-
-                embeddings = np.asarray(
-                    data["embeddings"],
-                    dtype=np.float32
-                )
-
-                # Make sure one embedding is also handled
-                # as a list of embeddings.
-                if embeddings.ndim == 1:
-                    embeddings = np.expand_dims(
-                        embeddings,
-                        axis=0
-                    )
-
-                registered_faces[name] = embeddings
-
-            # ------------------------------------------------
-            # OLD FORMAT
-            # ------------------------------------------------
-
+                embeddings = _normalize_rows(data["embeddings"])
             elif "embedding" in data:
-
-                embedding = np.asarray(
-                    data["embedding"],
-                    dtype=np.float32
-                )
-
-                registered_faces[name] = np.expand_dims(
-                    embedding,
-                    axis=0
-                )
-
+                embeddings = _normalize_rows(data["embedding"])
             else:
-
-                print(
-                    f"WARNING: No embedding found in "
-                    f"{filename}"
-                )
-
+                print(f"Skipped {filename}: no embedding data found.")
                 continue
-
-            print(
-                f"Loaded: {name} "
-                f"({len(registered_faces[name])} embeddings)"
-            )
-
+            if embeddings.size == 0 or embeddings.shape[1] == 0:
+                print(f"Skipped {filename}: empty embeddings.")
+                continue
+            registered_faces[name] = embeddings
+            print(f"Loaded {name}: {len(embeddings)} embeddings")
         except Exception as error:
-
-            print(
-                f"Could not load "
-                f"{filename}: {error}"
-            )
-
+            print(f"Could not load {filename}: {error}")
     return registered_faces
 
 
-# ============================================================
-# COSINE SIMILARITY
-# ============================================================
-
-def cosine_similarity(
-    embedding1,
-    embedding2
-):
-
-    embedding1 = np.asarray(
-        embedding1,
-        dtype=np.float32
-    )
-
-    embedding2 = np.asarray(
-        embedding2,
-        dtype=np.float32
-    )
-
-    norm1 = np.linalg.norm(
-        embedding1
-    )
-
-    norm2 = np.linalg.norm(
-        embedding2
-    )
-
-    if norm1 < 1e-10 or norm2 < 1e-10:
+def cosine_similarity(embedding1, embedding2):
+    a = np.asarray(embedding1, dtype=np.float32).reshape(-1)
+    b = np.asarray(embedding2, dtype=np.float32).reshape(-1)
+    if a.shape != b.shape:
         return -1.0
-
-    embedding1 = embedding1 / norm1
-    embedding2 = embedding2 / norm2
-
-    return float(
-        np.dot(
-            embedding1,
-            embedding2
-        )
-    )
+    a = a / max(float(np.linalg.norm(a)), 1e-10)
+    b = b / max(float(np.linalg.norm(b)), 1e-10)
+    return float(np.dot(a, b))
 
 
-# ============================================================
-# RECOGNIZE FACE
-# ============================================================
-
-def recognize_face(
-    face_image,
-    embedder,
-    registered_faces
-):
-
-    # --------------------------------------------------------
-    # VALIDATE IMAGE
-    #
-    # IMPORTANT:
-    # This function expects an RGB image.
-    # The main camera loop converts BGR -> RGB before
-    # extracting the face.
-    # --------------------------------------------------------
-
-    if face_image is None:
-
+def recognize_face(face_image, embedder, registered_faces):
+    """Return (name, cosine score). face_image must be RGB."""
+    if face_image is None or face_image.size == 0 or not registered_faces:
         return "UNKNOWN", 0.0
 
-    if face_image.size == 0:
-
-        return "UNKNOWN", 0.0
-
-    # --------------------------------------------------------
-    # RESIZE TO FACENET INPUT SIZE
-    # --------------------------------------------------------
-
-    face_image = cv2.resize(
-        face_image,
-        (160, 160),
-        interpolation=cv2.INTER_AREA
-    )
-
-    # --------------------------------------------------------
-    # CONVERT TO FLOAT32
-    # --------------------------------------------------------
-
-    face_image = face_image.astype(
-        np.float32
-    )
-
-    # --------------------------------------------------------
-    # ADD BATCH DIMENSION
-    # Shape:
-    # (160, 160, 3)
-    #        ↓
-    # (1, 160, 160, 3)
-    # --------------------------------------------------------
-
-    face_image = np.expand_dims(
-        face_image,
-        axis=0
-    )
-
-    # --------------------------------------------------------
-    # GENERATE LIVE FACE EMBEDDING
-    # --------------------------------------------------------
-
-    try:
-
-        embedding = embedder.embeddings(
-            face_image
-        )[0]
-
-    except Exception as error:
-
-        print(
-            f"ERROR generating face embedding: "
-            f"{error}"
-        )
-
-        return "UNKNOWN", 0.0
-
-    # --------------------------------------------------------
-    # INITIALIZE BEST MATCH
-    # --------------------------------------------------------
+    # FaceNet expects RGB pixels. Do not convert to BGR in this function.
+    face_image = cv2.resize(face_image, (160, 160), interpolation=cv2.INTER_AREA)
+    face_batch = np.expand_dims(face_image.astype(np.uint8), axis=0)
+    embedding = np.asarray(embedder.embeddings(face_batch)[0], dtype=np.float32)
+    embedding = embedding / max(float(np.linalg.norm(embedding)), 1e-10)
 
     best_name = "UNKNOWN"
     best_score = -1.0
-
-    # --------------------------------------------------------
-    # COMPARE AGAINST EVERY REGISTERED PERSON
-    # --------------------------------------------------------
-
-    for name, stored_embeddings in (
-        registered_faces.items()
-    ):
-
-        person_best_score = -1.0
-
-        # ----------------------------------------------------
-        # COMPARE AGAINST ALL EMBEDDINGS OF THIS PERSON
-        # ----------------------------------------------------
-
-        for stored_embedding in stored_embeddings:
-
-            score = cosine_similarity(
-                embedding,
-                stored_embedding
-            )
-
-            if score > person_best_score:
-
-                person_best_score = score
-
-        # ----------------------------------------------------
-        # KEEP THE BEST PERSON
-        # ----------------------------------------------------
-
-        if person_best_score > best_score:
-
-            best_score = person_best_score
+    for name, registered_embeddings in registered_faces.items():
+        rows = _normalize_rows(registered_embeddings)
+        if rows.shape[1] != embedding.shape[0]:
+            continue
+        scores = rows @ embedding
+        # Average the best few samples instead of trusting one accidental
+        # high-scoring registration sample.
+        top_count = min(3, len(scores))
+        person_score = float(np.mean(np.sort(scores)[-top_count:]))
+        if person_score > best_score:
             best_name = name
-
-    # --------------------------------------------------------
-    # NO REGISTERED FACES
-    # --------------------------------------------------------
-
-    if best_score < 0:
-
-        return "UNKNOWN", 0.0
-
-    # --------------------------------------------------------
-    # DEBUG INFORMATION
-    #
-    # This lets us see the actual similarity score.
-    # --------------------------------------------------------
-
-    # print(
-    #     f"Best match: {best_name} "
-    #     f"| Score: {best_score:.4f}"
-    # )
-
-    # --------------------------------------------------------
-    # APPLY RECOGNITION THRESHOLD
-    # --------------------------------------------------------
+            best_score = person_score
 
     if best_score >= RECOGNITION_THRESHOLD:
+        return best_name, best_score
+    return "UNKNOWN", best_score
 
-        return (
-            best_name,
-            best_score
-        )
-
-    return (
-        "UNKNOWN",
-        best_score
-    )
-
-
-# ============================================================
-# MAIN TEST PROGRAM
-# ============================================================
 
 def main():
-
-    # --------------------------------------------------------
-    # LOAD REGISTERED FACES
-    # --------------------------------------------------------
+    # Standalone recognition test. The integrated system uses app.main.
+    from mtcnn import MTCNN
+    from keras_facenet import FaceNet
 
     registered_faces = load_registered_faces()
-
     if not registered_faces:
-
-        print(
-            "No registered faces found."
-        )
-
-        print(
-            "Run register.py first."
-        )
-
+        print("No registered faces found. Run register.py first.")
         return
-
-    print()
-    print("Registered people:")
-
-    for name, embeddings in (
-        registered_faces.items()
-    ):
-
-        print(
-            f"- {name}: "
-            f"{len(embeddings)} embeddings"
-        )
-
-    # --------------------------------------------------------
-    # LOAD MTCNN
-    # --------------------------------------------------------
-
-    print()
-    print("Loading MTCNN...")
-
     detector = MTCNN()
-
-    # --------------------------------------------------------
-    # LOAD FACENET
-    # --------------------------------------------------------
-
-    print(
-        "Loading FaceNet..."
-    )
-
     embedder = FaceNet()
-
-    # --------------------------------------------------------
-    # OPEN CAMERA
-    # --------------------------------------------------------
-
-    camera = cv2.VideoCapture(
-        0,
-        cv2.CAP_MSMF
-    )
-
+    camera = cv2.VideoCapture(0, cv2.CAP_MSMF)
     if not camera.isOpened():
-
-        print(
-            "ERROR: Could not open camera."
-        )
-
+        camera.release()
+        camera = cv2.VideoCapture(0)
+    if not camera.isOpened():
+        print("ERROR: Could not open camera.")
         return
 
-    print()
-    print(
-        "SENTRIX face recognition started."
-    )
+    print("SentriX face recognition started. Press Q to quit.")
+    try:
+        while True:
+            success, frame = camera.read()
+            if not success:
+                print("ERROR: Could not read frame.")
+                break
+            rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+            faces = detector.detect_faces(rgb_frame) or []
+            for face in faces:
+                x, y, width, height = map(int, face["box"])
+                x, y = max(0, x), max(0, y)
+                x2 = min(rgb_frame.shape[1], x + max(1, width))
+                y2 = min(rgb_frame.shape[0], y + max(1, height))
+                if x2 <= x or y2 <= y:
+                    continue
+                name, score = recognize_face(rgb_frame[y:y2, x:x2], embedder, registered_faces)
+                color = (0, 255, 0) if name != "UNKNOWN" else (0, 0, 255)
+                cv2.rectangle(frame, (x, y), (x2, y2), color, 2)
+                cv2.putText(frame, f"{name} ({score:.2f})", (x, max(25, y - 10)), cv2.FONT_HERSHEY_SIMPLEX, 0.65, color, 2)
+            cv2.imshow("SentriX - Face Recognition", frame)
+            if cv2.waitKey(1) & 0xFF == ord("q"):
+                break
+    finally:
+        camera.release()
+        cv2.destroyAllWindows()
 
-    print(
-        "Press Q to quit."
-    )
-
-    # --------------------------------------------------------
-    # CAMERA LOOP
-    # --------------------------------------------------------
-
-    while True:
-
-        success, frame = camera.read()
-
-        if not success:
-
-            print(
-                "ERROR: Could not read frame."
-            )
-
-            break
-
-        # ----------------------------------------------------
-        # OPENCV FRAME:
-        # BGR
-        #
-        # MTCNN:
-        # RGB
-        # ----------------------------------------------------
-
-        rgb_frame = cv2.cvtColor(
-            frame,
-            cv2.COLOR_BGR2RGB
-        )
-
-        # ----------------------------------------------------
-        # DETECT FACES
-        # ----------------------------------------------------
-
-        faces = detector.detect_faces(
-            rgb_frame
-        )
-
-        # ----------------------------------------------------
-        # PROCESS EACH FACE
-        # ----------------------------------------------------
-
-        for face in faces:
-
-            # ------------------------------------------------
-            # MTCNN CONFIDENCE
-            # ------------------------------------------------
-
-            confidence = face.get(
-                "confidence",
-                0.0
-            )
-
-            # Ignore very weak detections.
-            if confidence < 0.90:
-
-                continue
-
-            # ------------------------------------------------
-            # FACE BOX
-            # ------------------------------------------------
-
-            x, y, width, height = (
-                face["box"]
-            )
-
-            # MTCNN can occasionally return
-            # negative coordinates.
-            x = max(0, x)
-            y = max(0, y)
-
-            # Prevent coordinates from exceeding frame.
-            x2 = min(
-                rgb_frame.shape[1],
-                x + width
-            )
-
-            y2 = min(
-                rgb_frame.shape[0],
-                y + height
-            )
-
-            # ------------------------------------------------
-            # VALIDATE BOX
-            # ------------------------------------------------
-
-            if x2 <= x or y2 <= y:
-
-                continue
-
-            # ------------------------------------------------
-            # EXTRACT RGB FACE
-            # ------------------------------------------------
-
-            face_image = rgb_frame[
-                y:y2,
-                x:x2
-            ]
-
-            if face_image.size == 0:
-
-                continue
-
-            # ------------------------------------------------
-            # RECOGNIZE
-            #
-            # recognize_face() expects RGB.
-            # ------------------------------------------------
-
-            name, score = recognize_face(
-                face_image,
-                embedder,
-                registered_faces
-            )
-
-            # ------------------------------------------------
-            # DISPLAY COLOR
-            # ------------------------------------------------
-
-            if name == "UNKNOWN":
-
-                box_color = (
-                    0,
-                    0,
-                    255
-                )
-
-                label = (
-                    f"UNKNOWN "
-                    f"({score:.2f})"
-                )
-
-            else:
-
-                box_color = (
-                    0,
-                    255,
-                    0
-                )
-
-                label = (
-                    f"{name} "
-                    f"({score:.2f})"
-                )
-
-            # ------------------------------------------------
-            # DRAW FACE BOX
-            # ------------------------------------------------
-
-            cv2.rectangle(
-                frame,
-                (x, y),
-                (x2, y2),
-                box_color,
-                2
-            )
-
-            # ------------------------------------------------
-            # DRAW LABEL
-            # ------------------------------------------------
-
-            cv2.putText(
-                frame,
-                label,
-                (
-                    x,
-                    max(
-                        25,
-                        y - 10
-                    )
-                ),
-                cv2.FONT_HERSHEY_SIMPLEX,
-                0.7,
-                box_color,
-                2
-            )
-
-        # ----------------------------------------------------
-        # STATUS
-        # ----------------------------------------------------
-
-        cv2.putText(
-            frame,
-            f"Faces detected: {len(faces)}",
-            (20, 40),
-            cv2.FONT_HERSHEY_SIMPLEX,
-            0.8,
-            (255, 255, 255),
-            2
-        )
-
-        # ----------------------------------------------------
-        # SHOW CAMERA
-        # ----------------------------------------------------
-
-        cv2.imshow(
-            "SENTRIX - Face Recognition",
-            frame
-        )
-
-        # ----------------------------------------------------
-        # QUIT
-        # ----------------------------------------------------
-
-        if cv2.waitKey(1) & 0xFF == ord("q"):
-
-            break
-
-    # --------------------------------------------------------
-    # CLEANUP
-    # --------------------------------------------------------
-
-    camera.release()
-
-    cv2.destroyAllWindows()
-
-
-# ============================================================
-# START
-# ============================================================
 
 if __name__ == "__main__":
-
     main()

@@ -229,6 +229,222 @@
             color: #ffbf45;
         }
 
+        /* RECORDINGS (COLLAPSIBLE / DATE-WISE) */
+
+        .recordings {
+            margin-top: 20px;
+        }
+
+        .recordings-header-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            cursor: pointer;
+            user-select: none;
+            padding: 4px 0;
+        }
+
+        .recordings-down-btn {
+            background: #1e293b;
+            color: #38bdf8;
+            border: 1px solid #334155;
+            padding: 8px 16px;
+            border-radius: 8px;
+            font-size: 13px;
+            font-weight: bold;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            transition: all 0.2s ease;
+        }
+
+        .recordings-down-btn:hover {
+            background: #2563eb;
+            color: #ffffff;
+            border-color: #3b82f6;
+        }
+
+        .recordings-arrow {
+            display: inline-block;
+            transition: transform 0.25s ease;
+            font-size: 12px;
+        }
+
+        .recordings-arrow.open {
+            transform: rotate(180deg);
+        }
+
+        .recordings-count-badge {
+            background: #1e3a5f;
+            color: #38bdf8;
+            font-size: 11.5px;
+            padding: 3px 10px;
+            border-radius: 12px;
+            font-weight: 600;
+        }
+
+        .recordings-body {
+            margin-top: 16px;
+            border-top: 1px solid #26313c;
+            padding-top: 16px;
+        }
+
+        .recordings-filter-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 12px;
+            margin-bottom: 16px;
+            background: #18212b;
+            padding: 10px 14px;
+            border-radius: 8px;
+            border: 1px solid #26313c;
+        }
+
+        .date-select {
+            background: #0f172a;
+            color: #e2e8f0;
+            border: 1px solid #334155;
+            padding: 6px 12px;
+            border-radius: 6px;
+            font-size: 13px;
+            outline: none;
+            cursor: pointer;
+        }
+
+        .date-group {
+            margin-bottom: 14px;
+            border: 1px solid #26313c;
+            border-radius: 10px;
+            overflow: hidden;
+            background: #121820;
+        }
+
+        .date-group-header {
+            background: #18212b;
+            padding: 12px 16px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            cursor: pointer;
+            user-select: none;
+            border-bottom: 1px solid #26313c;
+        }
+
+        .date-group-header:hover {
+            background: #1e293b;
+        }
+
+        .date-group-title {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 14px;
+            font-weight: bold;
+            color: #e2e8f0;
+        }
+
+        .date-group-items {
+            padding: 10px 14px;
+        }
+
+        .recording-card {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px 14px;
+            margin-bottom: 8px;
+            background: #18212b;
+            border: 1px solid #26313c;
+            border-radius: 8px;
+            gap: 14px;
+            flex-wrap: wrap;
+        }
+
+        .recording-card:last-child {
+            margin-bottom: 0;
+        }
+
+        .recording-info {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .recording-title {
+            font-size: 13.5px;
+            font-weight: 600;
+            color: #f1f5f9;
+            word-break: break-all;
+        }
+
+        .recording-meta-tags {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            flex-wrap: wrap;
+            font-size: 12px;
+            color: #94a3b8;
+        }
+
+        .recording-duration-pill {
+            background: #064e3b;
+            color: #6ee7b7;
+            padding: 2px 8px;
+            border-radius: 10px;
+            font-size: 11px;
+            font-weight: 600;
+            border: 1px solid #047857;
+        }
+
+        .recording-buttons {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+
+        .watch-btn {
+            background: #2563eb;
+            color: white;
+            text-decoration: none;
+            padding: 7px 13px;
+            border-radius: 6px;
+            font-size: 12px;
+            font-weight: 600;
+            white-space: nowrap;
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            border: none;
+            cursor: pointer;
+        }
+
+        .watch-btn:hover {
+            background: #1d4ed8;
+        }
+
+        .download-btn {
+            background: #1e293b;
+            color: #94a3b8;
+            border: 1px solid #334155;
+            text-decoration: none;
+            padding: 7px 13px;
+            border-radius: 6px;
+            font-size: 12px;
+            font-weight: 600;
+            white-space: nowrap;
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .download-btn:hover {
+            background: #334155;
+            color: #ffffff;
+        }
+
         /* REPORT */
 
         .report-card {
@@ -286,99 +502,10 @@
             min-height: 20px;
         }
 
-        /* EVENTS / RECORDINGS SEPARATE VIEWS */
-
-        .separate-view {
-            display: none;
-            margin-top: 20px;
-        }
-
-        .separate-view.active {
-            display: block;
-        }
-
-        .view-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            gap: 15px;
-            margin-bottom: 20px;
-            flex-wrap: wrap;
-        }
-
-        .view-header h2 {
-            margin: 0;
-        }
-
-        .back-button {
-            background: #273646;
-            color: white;
-            border: none;
-            padding: 10px 16px;
-            border-radius: 6px;
-            cursor: pointer;
-            font-size: 14px;
-        }
-
-        .back-button:hover {
-            background: #34495e;
-        }
-
-        /* RECORDINGS */
-
-        .recordings-list {
-            margin-top: 5px;
-        }
-
-        .recording-hour-group {
-            margin-bottom: 18px;
-        }
-
-        .recording-hour {
-            margin: 0 0 10px;
-            padding: 10px 14px;
-            background: #18212b;
-            border-left: 4px solid #34495e;
-            border-radius: 8px;
-            font-size: 15px;
-            font-weight: bold;
-            color: #d7dce2;
-        }
-
-        .recording {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 14px;
-            margin-bottom: 10px;
-            background: #18212b;
-            border-radius: 8px;
-            gap: 15px;
-        }
-
-        .recording-name {
-            word-break: break-all;
-        }
-
-        .watch-button {
-            background: #273646;
-            color: white;
-            text-decoration: none;
-            padding: 8px 14px;
-            border-radius: 6px;
-            white-space: nowrap;
-            border: none;
-            cursor: pointer;
-        }
-
-        .watch-button:hover {
-            background: #34495e;
-        }
-
         /* EVENTS */
 
-        .events-list {
-            margin-top: 5px;
+        .events {
+            margin-top: 20px;
         }
 
         .event {
@@ -391,6 +518,7 @@
             color: #77838f;
             padding: 15px 0;
         }
+
 
         /* SECURITY ALERT */
 
@@ -462,46 +590,6 @@
             background: #202c38;
         }
 
-        /* DASHBOARD QUICK LINKS */
-
-        .dashboard-links {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 15px;
-            margin-top: 20px;
-        }
-
-        .quick-link {
-            background: #111820;
-            border: 1px solid #26313c;
-            border-radius: 12px;
-            padding: 20px;
-        }
-
-        .quick-link h2 {
-            margin-top: 0;
-            font-size: 18px;
-        }
-
-        .quick-link p {
-            color: #9ba7b3;
-            margin-bottom: 15px;
-        }
-
-        .quick-link-button {
-            background: #273646;
-            color: white;
-            border: none;
-            padding: 10px 16px;
-            border-radius: 6px;
-            cursor: pointer;
-            font-size: 14px;
-        }
-
-        .quick-link-button:hover {
-            background: #34495e;
-        }
-
         /* RESPONSIVE */
 
         @media (max-width: 900px) {
@@ -509,10 +597,6 @@
             .top-grid {
                 grid-template-columns: 1fr;
                 gap: 15px;
-            }
-
-            .dashboard-links {
-                grid-template-columns: 1fr;
             }
 
             .container {
@@ -551,26 +635,233 @@
 
         }
 
-        @media (max-width: 600px) {
 
-            .recording {
-                flex-direction: column;
-                align-items: flex-start;
-            }
+        /* QUERY ENGINE STYLING */
+        .query-card {
+            margin-top: 20px;
+        }
 
-            .watch-button {
-                width: 100%;
-                text-align: center;
-            }
+        .query-input-wrap {
+            display: flex;
+            gap: 10px;
+            margin-top: 14px;
+        }
 
-            .view-header {
-                align-items: flex-start;
-            }
+        .query-input {
+            flex: 1;
+            background: #18212b;
+            border: 1px solid #344454;
+            border-radius: 8px;
+            padding: 12px 16px;
+            color: white;
+            font-size: 15px;
+        }
 
-            .back-button {
-                width: 100%;
-            }
+        .query-input:focus {
+            outline: none;
+            border-color: #3b82f6;
+        }
 
+        .query-btn {
+            background: #2563eb;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            padding: 12px 22px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .query-btn:hover {
+            background: #1d4ed8;
+        }
+
+        .chip-group {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-top: 14px;
+        }
+
+        .query-chip {
+            background: #1e293b;
+            border: 1px solid #334155;
+            color: #93c5fd;
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 12.5px;
+            cursor: pointer;
+            transition: all 0.2s;
+            user-select: none;
+        }
+
+        .query-chip:hover {
+            background: #2563eb;
+            color: white;
+            border-color: #3b82f6;
+        }
+
+        .query-answer-card {
+            margin-top: 18px;
+            background: #18212b;
+            border: 1px solid #26313c;
+            border-radius: 10px;
+            padding: 18px;
+            display: none;
+        }
+
+        .query-answer-text {
+            font-size: 15px;
+            line-height: 1.5;
+            color: #f1f5f9;
+            white-space: pre-line;
+        }
+
+        .query-metrics-row {
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+            margin-top: 14px;
+        }
+
+        .query-metric-badge {
+            background: #0f172a;
+            border: 1px solid #334155;
+            padding: 6px 14px;
+            border-radius: 6px;
+            font-size: 12px;
+            color: #94a3b8;
+        }
+
+        .query-metric-badge strong {
+            color: #38bdf8;
+            margin-left: 4px;
+        }
+
+        .query-table-wrap {
+            max-height: 280px;
+            overflow-y: auto;
+            margin-top: 14px;
+            border-radius: 6px;
+            border: 1px solid #26313c;
+        }
+
+        .query-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 13px;
+        }
+
+        .query-table th {
+            background: #0f172a;
+            color: #94a3b8;
+            text-align: left;
+            padding: 9px 12px;
+            border-bottom: 1px solid #334155;
+            position: sticky;
+            top: 0;
+        }
+
+        .query-table td {
+            padding: 9px 12px;
+            border-bottom: 1px solid #1e293b;
+            color: #e2e8f0;
+        }
+
+        .query-table tr:hover {
+            background: #1e293b;
+        }
+
+/* TAMPER SIREN & DETERRENT ALARM STYLES */
+        .siren-emergency-banner {
+            background: linear-gradient(90deg, #dc2626, #b91c1c);
+            color: white;
+            padding: 14px 22px;
+            border-radius: 8px;
+            font-weight: bold;
+            font-size: 15px;
+            margin-bottom: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 0 24px rgba(220, 38, 38, 0.7);
+            animation: siren-pulse 1s infinite alternate;
+        }
+
+        @keyframes siren-pulse {
+            0% { opacity: 0.9; transform: scale(1); }
+            100% { opacity: 1; transform: scale(1.008); box-shadow: 0 0 35px rgba(239, 68, 68, 0.95); }
+        }
+
+        .siren-mute-btn {
+            background: #ffffff;
+            color: #991b1b;
+            border: none;
+            font-weight: bold;
+            padding: 8px 16px;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-size: 13px;
+        }
+
+        .siren-mute-btn:hover {
+            background: #fee2e2;
+            color: #7f1d1d;
+        }
+
+        .siren-test-btn {
+            background: #273544;
+            color: #e2e8f0;
+            border: 1px solid #475569;
+            font-weight: bold;
+            padding: 8px 16px;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-size: 13px;
+        }
+
+        .siren-test-btn:hover {
+            background: #334155;
+            color: white;
+        }
+
+        .control-panel-row {
+            display: flex;
+            gap: 12px;
+            margin-top: 12px;
+            flex-wrap: wrap;
+        }
+
+        .pill-btn {
+            background: #18212b;
+            border: 1px solid #344454;
+            color: #cbd5e1;
+            padding: 8px 14px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 13px;
+            font-weight: bold;
+            transition: all 0.2s;
+        }
+
+        .pill-btn:hover {
+            background: #202c38;
+            color: white;
+        }
+
+        .pill-btn.active {
+            background: #2563eb;
+            border-color: #3b82f6;
+            color: white;
+        }
+
+        .pill-btn.danger {
+            background: #b91c1c;
+            border-color: #ef4444;
+            color: white;
         }
 
     </style>
@@ -590,7 +881,6 @@
         aria-live="assertive"
         aria-atomic="true"
     >
-
         <button
             class="security-popup-close"
             type="button"
@@ -611,7 +901,6 @@
         <div id="securityPopupTime" class="security-popup-time">
             Just now
         </div>
-
     </div>
 
 
@@ -632,88 +921,31 @@
     <div class="container">
 
 
-        <!-- ================================================= -->
-        <!-- MAIN DASHBOARD -->
-        <!-- ================================================= -->
+        <!-- MAIN MONITORING AREA -->
 
-        <div id="mainDashboard">
+        <div class="top-grid">
 
+            <!-- LEFT: ALERT + CAMERA + VOICE -->
 
-            <!-- MAIN MONITORING AREA -->
+            <div class="left-column">
 
-            <div class="top-grid">
+<!-- LIVE CAMERA -->
 
+                <div class="card camera-card">
 
-                <!-- LEFT: CAMERA + VOICE -->
+                    <h2>📷 Live Camera</h2>
 
-                <div class="left-column">
+                    <div class="live-camera-wrap">
 
+                        <img
+                            id="liveCamera"
+                            class="live-camera"
+                            src="/video_feed"
+                            alt="SENTRIX Live Camera"
+                        >
 
-                    <!-- LIVE CAMERA -->
-
-                    <div class="card camera-card">
-
-                        <h2>📷 Live Camera</h2>
-
-                        <div class="live-camera-wrap">
-
-                            <img
-                                id="liveCamera"
-                                class="live-camera"
-                                src="/video_feed"
-                                alt="SENTRIX Live Camera"
-                            >
-
-                            <div
-                                id="cameraHelp"
-                                class="camera-help"
-                            >
-                                Camera stream is not available.
-                                Check that SENTRIX is running and
-                                the camera is active.
-                            </div>
-
-                        </div>
-
-                    </div>
-
-
-                    <!-- VOICE MONITOR -->
-
-                    <div class="card voice-monitor">
-
-                        <div>
-
-                            <strong>
-                                🔊 Voice Monitor
-                            </strong>
-
-                            <div
-                                id="voiceStatus"
-                                class="voice-status"
-                            >
-                                Voice disabled — tap Enable Voice
-                            </div>
-
-                        </div>
-
-                        <div>
-
-                            <button
-                                id="voiceButton"
-                                class="voice-button"
-                                onclick="toggleVoice()"
-                            >
-                                Enable Voice
-                            </button>
-
-                            <button
-                                class="voice-button"
-                                onclick="testVoice()"
-                            >
-                                🔊 Test Voice
-                            </button>
-
+                        <div id="cameraHelp" class="camera-help">
+                            Camera stream is not available. Check that SENTRIX is running and the camera is active.
                         </div>
 
                     </div>
@@ -721,250 +953,193 @@
                 </div>
 
 
-                <!-- RIGHT: SYSTEM STATUS -->
+                <!-- VOICE MONITOR -->
 
+                <div class="card voice-monitor">
+
+                    <div>
+                        <strong>🔊 Voice Monitor</strong>
+
+                        <div id="voiceStatus" class="voice-status">
+                            Voice disabled — tap Enable Voice
+                        </div>
+                    </div>
+
+                    <div>
+                        <button
+                            id="voiceButton"
+                            class="voice-button"
+                            onclick="toggleVoice()"
+                        >
+                            Enable Voice
+                        </button>
+
+                        <button
+                            class="voice-button"
+                            onclick="testVoice()"
+                        >
+                            🔊 Test Voice
+                        </button>
+                    </div>
+
+                </div>
+
+                <!-- TAMPER SIREN & DETERRENT CONTROLS (EXAMINER RECOMMENDATION 4) -->
                 <div class="card">
+                    <div style="display:flex; justify-content:space-between; align-items:center;">
+                        <strong>🚨 Tamper Siren Deterrent</strong>
+                        <span id="sirenBadge" style="font-size:12px; color:#36d17c; font-weight:bold;">STANDBY</span>
+                    </div>
+                    <p style="color:#9ba7b3; font-size:13px; margin:6px 0 10px;">
+                        Instantly triggers an audible deterrent siren when camera tampering (lens covered, blur, or movement) is detected.
+                    </p>
+                    <div style="display:flex; gap:10px;">
+                        <button class="siren-test-btn" onclick="triggerSirenTest()">🔊 Test Siren</button>
+                        <button class="siren-mute-btn" onclick="muteSiren()">🔇 Silence</button>
+                    </div>
+                </div>
 
-                    <h2>System Status</h2>
+                <!-- UPLOAD OBJECT TO MONITOR CARD -->
+                <div class="card">
+                    <div style="display:flex; justify-content:space-between; align-items:center;">
+                        <strong>🎯 Upload Object to Monitor</strong>
+                        <span id="objMonitorBadge" style="font-size:12px; color:#94a3b8; font-weight:bold;">NOT SET</span>
+                    </div>
+                    <p style="color:#9ba7b3; font-size:13px; margin:6px 0 10px;">
+                        Upload an image of an object to monitor. SENTRIX continuously verifies its presence in camera view and alerts if it is not available.
+                    </p>
 
-                    <div class="status-grid">
-
-
-                        <div class="status-item">
-
-                            <span class="status-name">
-                                Camera
-                            </span>
-
-                            <span
-                                id="cameraStatus"
-                                class="status-value"
-                            >
-                                STARTING
-                            </span>
-
+                    <!-- Preview when an object is loaded -->
+                    <div id="monitoredObjectPreviewWrap" style="display:none; align-items:center; gap:12px; margin-bottom:12px; background:#18212b; padding:10px; border-radius:8px; border:1px solid #334155;">
+                        <img id="monitoredObjectThumb" src="/api/object-monitor/image" alt="Monitored Object" style="width:54px; height:54px; object-fit:cover; border-radius:6px; border:1px solid #475569;" />
+                        <div style="flex:1;">
+                            <div id="monitoredObjectName" style="font-weight:bold; color:#f8fafc; font-size:13px;">Monitored Asset</div>
+                            <div id="monitoredObjectSubtext" style="color:#94a3b8; font-size:12px;">Active surveillance in progress</div>
                         </div>
-
-
-                        <div class="status-item">
-
-                            <span class="status-name">
-                                Motion
-                            </span>
-
-                            <span
-                                id="motionStatus"
-                                class="status-value"
-                            >
-                                CLEAR
-                            </span>
-
-                        </div>
-
-
-                        <div class="status-item">
-
-                            <span class="status-name">
-                                Face
-                            </span>
-
-                            <span
-                                id="faceStatus"
-                                class="status-value"
-                            >
-                                NONE
-                            </span>
-
-                        </div>
-
-
-                        <div class="status-item">
-
-                            <span class="status-name">
-                                Person
-                            </span>
-
-                            <span
-                                id="personStatus"
-                                class="status-value"
-                            >
-                                NONE
-                            </span>
-
-                        </div>
-
-
-                        <div class="status-item">
-
-                            <span class="status-name">
-                                Tamper
-                            </span>
-
-                            <span
-                                id="tamperStatus"
-                                class="status-value"
-                            >
-                                CAMERA OK
-                            </span>
-
-                        </div>
-
-
-                        <div class="status-item">
-
-                            <span class="status-name">
-                                Recording
-                            </span>
-
-                            <span
-                                id="recordingStatus"
-                                class="status-value"
-                            >
-                                NO
-                            </span>
-
-                        </div>
-
-
+                        <button class="pill-btn" onclick="clearMonitoredObject()" style="color:#f87171; border-color:#7f1d1d; font-size:11px; padding:4px 8px;">✕ Clear</button>
                     </div>
 
+                    <!-- File upload form -->
+                    <div style="display:flex; flex-direction:column; gap:8px;">
+                        <div style="display:flex; gap:8px; align-items:center;">
+                            <input type="file" id="objectImageFile" accept="image/*" style="font-size:12px; color:#cbd5e1; flex:1;" />
+                            <button class="voice-button" onclick="uploadObjectToMonitor()" style="padding:7px 14px; white-space:nowrap;">📤 Upload & Monitor</button>
+                        </div>
+                        <span id="uploadStatusMsg" style="font-size:12px; color:#94a3b8;"></span>
+                    </div>
                 </div>
 
             </div>
 
 
-
-            <!-- DAILY SECURITY REPORT -->
-
-            <div class="card report-card">
-
-                <h2>📄 Daily Security Report</h2>
-
-                <p class="report-description">
-
-                    Select a date and generate a security report
-                    containing the day's security activity.
-
-                </p>
-
-
-                <div class="report-controls">
-
-                    <input
-                        type="date"
-                        id="reportDate"
-                        class="report-date"
-                    >
-
-                    <button
-                        id="generateReportButton"
-                        class="report-button"
-                        onclick="generateReport()"
-                    >
-                        Generate Report
-                    </button>
-
-                </div>
-
-
-                <div
-                    id="reportMessage"
-                    class="report-message"
-                ></div>
-
-            </div>
-
-
-
-            <!-- ONLY TWO NEW DASHBOARD SECTIONS -->
-
-            <div class="dashboard-links">
-
-
-                <!-- RECORDINGS LINK -->
-
-                <div class="quick-link">
-
-                    <h2>🎥 Recordings</h2>
-
-                    <p>
-                        View and download all SENTRIX security
-                        recordings.
-                    </p>
-
-                    <button
-                        class="quick-link-button"
-                        onclick="showView('recordings')"
-                    >
-                        View Recordings
-                    </button>
-
-                </div>
-
-
-                <!-- EVENTS LINK -->
-
-                <div class="quick-link">
-
-                    <h2>📋 Recent Events</h2>
-
-                    <p>
-                        View the complete SENTRIX security
-                        event history.
-                    </p>
-
-                    <button
-                        class="quick-link-button"
-                        onclick="showView('events')"
-                    >
-                        View Events
-                    </button>
-
-                </div>
-
-
-            </div>
-
-
-        </div>
-
-
-
-        <!-- ================================================= -->
-        <!-- RECORDINGS VIEW -->
-        <!-- ================================================= -->
-
-        <div
-            id="recordingsView"
-            class="separate-view"
-        >
+            <!-- RIGHT: SYSTEM STATUS -->
 
             <div class="card">
 
-                <div class="view-header">
+                <h2>System Status</h2>
 
-                    <h2>
-                        🎥 SENTRIX Recordings
-                    </h2>
+                <div class="status-grid">
 
-                    <button
-                        class="back-button"
-                        onclick="showView('dashboard')"
-                    >
-                        ← Back to Dashboard
-                    </button>
+                    <div class="status-item">
+
+                        <span class="status-name">
+                            Camera
+                        </span>
+
+                        <span
+                            id="cameraStatus"
+                            class="status-value">
+                            STARTING
+                        </span>
+
+                    </div>
+
+
+                    <div class="status-item">
+
+                        <span class="status-name">
+                            Motion
+                        </span>
+
+                        <span
+                            id="motionStatus"
+                            class="status-value">
+                            CLEAR
+                        </span>
+
+                    </div>
+
+
+                    <div class="status-item">
+
+                        <span class="status-name">
+                            Face
+                        </span>
+
+                        <span
+                            id="faceStatus"
+                            class="status-value">
+                            NONE
+                        </span>
+
+                    </div>
+
+
+                    <div class="status-item">
+
+                        <span class="status-name">
+                            Person
+                        </span>
+
+                        <span
+                            id="personStatus"
+                            class="status-value">
+                            NONE
+                        </span>
+
+                    </div>
+
+
+                    <div class="status-item">
+
+                        <span class="status-name">
+                            Tamper
+                        </span>
+
+                        <span
+                            id="tamperStatus"
+                            class="status-value">
+                            CAMERA OK
+                        </span>
+
+                    </div>
+
+
+                    <div class="status-item">
+
+                        <span class="status-name">
+                            Recording
+                        </span>
+
+                        <span
+                            id="recordingStatus"
+                            class="status-value">
+                            NO
+                        </span>
+
+                    </div>
+
+                    <div class="status-item">
+                        <span class="status-name">Tamper Siren</span>
+                        <span id="sirenStatus" class="status-value ok">STANDBY</span>
+                    </div>
+
+                    <div class="status-item">
+                        <span class="status-name">Monitored Object</span>
+                        <span id="monitoredObjectStatus" class="status-value ok">NOT SET</span>
+                    </div>
 
                 </div>
-
-
-                <div
-                    id="recordingsList"
-                    class="recordings-list"
-                >
-
-                    <div class="empty">
-                        No recordings yet.
-                    </div>
 
                 </div>
 
@@ -973,115 +1148,150 @@
         </div>
 
 
+        <!-- RECORDINGS SECTION (COLLAPSIBLE / DATE-WISE ACCORDION) -->
 
-        <!-- ================================================= -->
-        <!-- EVENTS VIEW -->
-        <!-- ================================================= -->
+        <div class="card recordings">
 
-        <div
-            id="eventsView"
-            class="separate-view"
-        >
-
-            <div class="card">
-
-                <div class="view-header">
-
-                    <h2>
-                        📋 SENTRIX Recent Events
-                    </h2>
-
-                    <button
-                        class="back-button"
-                        onclick="showView('dashboard')"
-                    >
-                        ← Back to Dashboard
-                    </button>
-
+            <div class="recordings-header-row" onclick="toggleRecordingsPanel()">
+                <div style="display:flex; align-items:center; gap:12px;">
+                    <h2 style="margin:0;">🎥 Video Recordings</h2>
+                    <span id="recordingsTotalBadge" class="recordings-count-badge">0 videos</span>
                 </div>
 
+                <!-- DOWN BUTTON -->
+                <button id="recordingsDownBtn" class="recordings-down-btn" onclick="event.stopPropagation(); toggleRecordingsPanel()">
+                    <span id="recordingsBtnText">Show Video Recordings</span>
+                    <span id="recordingsArrowIcon" class="recordings-arrow">▼</span>
+                </button>
+            </div>
 
-                <div
-                    id="eventsList"
-                    class="events-list"
+            <!-- COLLAPSIBLE CONTENT (TOGGLED BY DOWN BUTTON) -->
+            <div id="recordingsPanel" class="recordings-body" style="display:none;">
+                <!-- Filter bar: Date selector and minimum 1 minute notice -->
+                <div class="recordings-filter-bar">
+                    <div style="display:flex; align-items:center; gap:8px;">
+                        <span style="color:#9ba7b3; font-size:13px; font-weight:600;">Filter by Date:</span>
+                        <select id="recordingDateFilter" class="date-select" onchange="filterRecordingsBySelectedDate()">
+                            <option value="ALL">All Dates</option>
+                        </select>
+                    </div>
+                    <span style="font-size:12px; color:#38bdf8; background:#0c2340; padding:4px 10px; border-radius:12px; border:1px solid #1e3a5f;">
+                        ⏱ Surveillance rule: Each recording is minimum 1 minute
+                    </span>
+                </div>
+
+                <!-- Date-wise groups container -->
+                <div id="recordingsDateGroups">
+                    <div class="empty">Loading video recordings...</div>
+                </div>
+            </div>
+        </div>
+
+
+
+        <!-- ASK SENTRIX AI QUERY ENGINE (EXAMINER RECOMMENDATION 1) -->
+        <div class="card query-card">
+            <h2>💬 Ask SENTRIX AI (Surveillance Query Engine)</h2>
+            <p style="color:#9ba7b3; margin:4px 0 12px; font-size:14px;">
+                Query monitored object status, when object was last there, missing alerts, personnel, tamper incidents, and recordings.
+            </p>
+
+            <div class="query-input-wrap">
+                <input
+                    type="text"
+                    id="queryInput"
+                    class="query-input"
+                    placeholder="e.g. Who was detected today? / Was there any tampering? / Summary of events..."
+                    onkeydown="if(event.key==='Enter') executeQuery()"
+                >
+                <button class="query-btn" onclick="executeQuery()">Ask AI</button>
+            </div>
+
+            <!-- Quick Query Prompt Chips -->
+            <div class="chip-group">
+                <span class="query-chip" onclick="setQuery('When was the object last there?')">🎯 When was object last there?</span>
+                <span class="query-chip" onclick="setQuery('When was the object missing?')">📦 When was object missing?</span>
+                <span class="query-chip" onclick="setQuery('Who was detected today?')">👤 Who visited today?</span>
+                <span class="query-chip" onclick="setQuery('Was there any camera tampering?')">🚨 Tamper & Siren alerts</span>
+                <span class="query-chip" onclick="setQuery('Security summary for today')">📊 Today's summary</span>
+                <span class="query-chip" onclick="setQuery('How many recordings were made?')">🎥 Recordings stats</span>
+            </div>
+
+            <!-- Query Answer Container -->
+            <div id="queryAnswerCard" class="query-answer-card">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+                    <strong style="color:#38bdf8; font-size:14px;">SENTRIX Intelligence Response</strong>
+                    <button style="background:none; border:none; color:#94a3b8; font-size:18px; cursor:pointer;" onclick="closeQueryAnswer()">✕</button>
+                </div>
+                <div id="queryAnswerText" class="query-answer-text"></div>
+                <div id="queryMetricsRow" class="query-metrics-row"></div>
+                <div id="queryTableWrap" class="query-table-wrap" style="display:none;">
+                    <table id="queryTable" class="query-table"></table>
+                </div>
+            </div>
+        </div>
+
+
+        <!-- DAILY SECURITY REPORT -->
+
+        <div class="card report-card">
+
+            <h2>📄 Daily Security Report</h2>
+
+            <p class="report-description">
+
+                Select a date and generate a security report
+                containing the day's security activity.
+
+            </p>
+
+
+            <div class="report-controls">
+
+                <input
+                    type="date"
+                    id="reportDate"
+                    class="report-date"
                 >
 
-                    <div class="empty">
-                        No events yet.
-                    </div>
-
-                </div>
+                <button
+                    id="generateReportButton"
+                    class="report-button"
+                    onclick="generateReport()"
+                >
+                    Generate Report
+                </button>
 
             </div>
 
+
+            <div
+                id="reportMessage"
+                class="report-message"
+            ></div>
+
+        </div>
+
+
+        <!-- RECENT EVENTS -->
+
+        <div class="card events">
+
+            <h2>📋 Recent Events</h2>
+
+            <div id="eventsList">
+
+                <div class="empty">
+                    No events yet.
+                </div>
+            </div>
         </div>
 
 
     </div>
 
 
-
     <script>
-
-
-        /* =================================
-           VIEW SWITCHING
-        ================================= */
-
-        function showView(view) {
-
-            const dashboard =
-                document.getElementById(
-                    "mainDashboard"
-                );
-
-            const recordings =
-                document.getElementById(
-                    "recordingsView"
-                );
-
-            const events =
-                document.getElementById(
-                    "eventsView"
-                );
-
-
-            dashboard.style.display = "none";
-
-            recordings.classList.remove("active");
-
-            events.classList.remove("active");
-
-
-            if (view === "recordings") {
-
-                recordings.classList.add("active");
-
-                updateRecordings();
-
-            }
-
-            else if (view === "events") {
-
-                events.classList.add("active");
-
-                updateEvents();
-
-            }
-
-            else {
-
-                dashboard.style.display = "block";
-
-            }
-
-            window.scrollTo({
-                top: 0,
-                behavior: "smooth"
-            });
-
-        }
-
 
 
         /* =================================
@@ -1236,6 +1446,58 @@
                         : "ok"
                     );
 
+                /* SIREN DETERRENT STATUS (EXAMINER RECOMMENDATION 4) */
+                const sirenBanner = document.getElementById("sirenEmergencyBanner");
+                const sirenEl = document.getElementById("sirenStatus");
+                const sirenBadge = document.getElementById("sirenBadge");
+                if (data.siren) {
+                    if (sirenBanner) sirenBanner.style.display = "flex";
+                    if (sirenEl) { sirenEl.textContent = "ALARM ACTIVE"; sirenEl.className = "status-value danger"; }
+                    if (sirenBadge) { sirenBadge.textContent = "ALARM ACTIVE"; sirenBadge.style.color = "#ff5757"; }
+                    playBrowserSiren();
+                } else {
+                    if (sirenBanner) sirenBanner.style.display = "none";
+                    if (sirenEl) { sirenEl.textContent = "STANDBY"; sirenEl.className = "status-value ok"; }
+                    if (sirenBadge) { sirenBadge.textContent = "STANDBY"; sirenBadge.style.color = "#36d17c"; }
+                    stopBrowserSiren();
+                }
+
+                /* MONITORED OBJECT STATUS */
+                const objData = data.object_monitor;
+                const objBadge = document.getElementById("objMonitorBadge");
+                const objStatusEl = document.getElementById("monitoredObjectStatus");
+                const objBanner = document.getElementById("objectAlertBanner");
+                const objPreviewWrap = document.getElementById("monitoredObjectPreviewWrap");
+                const objNameEl = document.getElementById("monitoredObjectName");
+                const objThumb = document.getElementById("monitoredObjectThumb");
+
+                if (objData && objData.has_object) {
+                    if (objPreviewWrap) objPreviewWrap.style.display = "flex";
+                    if (objNameEl) objNameEl.textContent = objData.object_name || "Monitored Asset";
+
+                    if (objData.is_present) {
+                        if (objBadge) { objBadge.textContent = "IN VIEW"; objBadge.style.color = "#36d17c"; }
+                        if (objStatusEl) { objStatusEl.textContent = "IN VIEW"; objStatusEl.className = "status-value ok"; }
+                        if (objBanner) objBanner.style.display = "none";
+                        window.lastObjectAlertState = false;
+                    } else {
+                        if (objBadge) { objBadge.textContent = "NOT DETECTED (ALERT)"; objBadge.style.color = "#ef4444"; }
+                        if (objStatusEl) { objStatusEl.textContent = "NOT DETECTED"; objStatusEl.className = "status-value danger"; }
+                        if (objBanner) objBanner.style.display = "flex";
+                        if (window.lastObjectAlertState !== true) {
+                            window.lastObjectAlertState = true;
+                            speakAlert("Warning! Monitored object is not available in camera view!");
+                        }
+                    }
+                } else {
+                    if (objPreviewWrap) objPreviewWrap.style.display = "none";
+                    if (objBadge) { objBadge.textContent = "NOT SET"; objBadge.style.color = "#94a3b8"; }
+                    if (objStatusEl) { objStatusEl.textContent = "NOT SET"; objStatusEl.className = "status-value ok"; }
+                    if (objBanner) objBanner.style.display = "none";
+                    window.lastObjectAlertState = false;
+                }
+
+
             }
 
             catch (error) {
@@ -1250,376 +1512,186 @@
         }
 
 
-
         /* =================================
            CRITICAL ALERT + VOICE MONITOR
         ================================= */
 
         let voiceEnabled = false;
-
         let lastCriticalEvent = "";
-
         let eventsInitialized = false;
-
         let popupTimer = null;
 
         let voiceQueue = [];
-
         let isSpeaking = false;
-
         const ALERT_COOLDOWN = 6000;
-
         const lastAlertTime = {};
 
-
         function canAlert(eventType) {
-
-            const now =
-                Date.now();
+            const now = Date.now();
 
             if (
                 lastAlertTime[eventType] &&
-                now - lastAlertTime[eventType]
-                < ALERT_COOLDOWN
+                now - lastAlertTime[eventType] < ALERT_COOLDOWN
             ) {
-
                 return false;
-
             }
 
-            lastAlertTime[eventType] =
-                now;
-
+            lastAlertTime[eventType] = now;
             return true;
-
         }
 
+    function speakAlert(text) {
+        if (!voiceEnabled || !text) return;
 
-        function speakAlert(text) {
+        // Add the new alert to the queue
+        voiceQueue.push(text);
 
-            if (!voiceEnabled || !text) {
-                return;
-            }
+        // Start speaking if nothing is currently being spoken
+        processVoiceQueue();
+    }
 
-            voiceQueue.push(text);
-
-            processVoiceQueue();
-
+    function processVoiceQueue() {
+        if (isSpeaking || voiceQueue.length === 0 || !voiceEnabled) {
+            return;
         }
 
+        const text = voiceQueue.shift();
 
-        function processVoiceQueue() {
+        const utterance = new SpeechSynthesisUtterance(text);
 
-            if (
-                isSpeaking ||
-                voiceQueue.length === 0 ||
-                !voiceEnabled
-            ) {
+        utterance.rate = 0.9;
+        utterance.pitch = 1.0;
+        utterance.volume = 1.0;
 
-                return;
+        isSpeaking = true;
 
-            }
-
-            const text =
-                voiceQueue.shift();
-
-            const utterance =
-                new SpeechSynthesisUtterance(
-                    text
-                );
-
-            utterance.rate = 0.9;
-            utterance.pitch = 1.0;
-            utterance.volume = 1.0;
-
-            isSpeaking = true;
-
-
-            utterance.onend =
-                function () {
-
-                    isSpeaking = false;
-
-                    setTimeout(
-                        () => {
-                            processVoiceQueue();
-                        },
-                        200
-                    );
-
-                };
-
-
-            utterance.onerror =
-                function () {
-
-                    isSpeaking = false;
-
-                    processVoiceQueue();
-
-                };
-
-
-            window.speechSynthesis.speak(
-                utterance
-            );
-
-        }
-
-
-        function stopVoiceAlerts() {
-
-            voiceQueue = [];
-
+        utterance.onend = function () {
             isSpeaking = false;
 
+            // Wait a tiny moment before the next alert
+            setTimeout(() => {
+                processVoiceQueue();
+            }, 200);
+        };
+
+        utterance.onerror = function () {
+            isSpeaking = false;
+            processVoiceQueue();
+        };
+
+        window.speechSynthesis.speak(utterance);
+}
+       function stopVoiceAlerts() {
+            voiceQueue = [];
+            isSpeaking = false;
             window.speechSynthesis.cancel();
-
         }
-
-
+        
 
         function getCriticalAlert(eventText) {
 
-            const parts =
-                String(eventText).split(" - ");
-
-            const message =
-                parts.length > 1
+            const parts = String(eventText).split(" - ");
+            const message = parts.length > 1
                 ? parts.slice(1).join(" - ")
                 : String(eventText);
+            const lower = message.toLowerCase();
 
-            const lower =
-                message.toLowerCase();
-
-
-            if (
-                lower.includes(
-                    "unknown person detected"
-                )
-            ) {
-
+            if (lower.includes("monitored object not detected") || lower.includes("object_alert")) {
                 return {
+                    type: "object_alert",
+                    title: "⚠️ OBJECT MONITORING ALERT",
+                    message: "Monitored object not detected in camera view!",
+                    voice: "Warning! Monitored object is not available in camera view!"
+                };
+            }
 
+            if (lower.includes("unknown person detected")) {
+                return {
                     type: "unknown",
-
-                    title:
-                        "🔴 SECURITY ALERT",
-
-                    message:
-                        "Unknown person detected",
-
-                    voice:
-                        "Attention. Unknown person detected."
-
+                    title: "🔴 SECURITY ALERT",
+                    message: "Unknown person detected",
+                    voice: "Attention. Unknown person detected."
                 };
-
             }
 
-
-            if (
-                lower.includes("recognized")
-            ) {
-
-                const match =
-                    message.match(
-                        /(.+?) recognized/i
-                    );
-
-                const person =
-                    match
-                    ? match[1].trim()
-                    : "Known person";
-
-
+            if (lower.includes("recognized")) {
+                const match = message.match(/(.+?) recognized/i);
+                const person = match ? match[1].trim() : "Known person";
                 return {
-
                     type: "known",
-
-                    title:
-                        "🟢 SECURITY NOTIFICATION",
-
-                    message:
-                        person + " recognized",
-
-                    voice:
-                        "Known person recognized. "
-                        + person
-
+                    title: "🟢 SECURITY NOTIFICATION",
+                    message: person + " recognized",
+                    voice: "Known person recognized. " + person
                 };
-
             }
 
-
-            if (
-                lower.includes("lens covered")
-            ) {
-
+            if (lower.includes("lens covered")) {
                 return {
-
                     type: "tamper",
-
-                    title:
-                        "🔴 SECURITY ALERT",
-
-                    message:
-                        "Lens covered",
-
-                    voice:
-                        "Warning. Camera lens covered."
-
+                    title: "🔴 SECURITY ALERT",
+                    message: "Lens covered",
+                    voice: "Warning. Camera lens covered."
                 };
-
             }
 
-
-            if (
-                lower.includes("camera blurred") ||
-                lower.includes("lens blurred")
-            ) {
-
+            if (lower.includes("camera blurred") ||
+                lower.includes("lens blurred")) {
                 return {
-
                     type: "tamper",
-
-                    title:
-                        "🔴 SECURITY ALERT",
-
-                    message:
-                        "Camera lens blurred",
-
-                    voice:
-                        "Warning. Camera lens is blurred."
-
+                    title: "🔴 SECURITY ALERT",
+                    message: "Camera lens blurred",
+                    voice: "Warning. Camera lens is blurred."
                 };
-
             }
 
-
-            if (
-                lower.includes("camera moved")
-            ) {
-
+            if (lower.includes("camera moved") || lower.includes("lens covered") || lower.includes("camera blurred") || lower.includes("tamper")) {
                 return {
-
                     type: "tamper",
-
-                    title:
-                        "🔴 SECURITY ALERT",
-
-                    message:
-                        "Camera moved",
-
-                    voice:
-                        "Warning. Camera has been moved."
-
+                    title: "🚨 TAMPER ALARM TRIGGERED",
+                    message: "Camera tampering detected! Deterrent siren activated.",
+                    voice: "Warning! Camera tampering detected! Siren activated!"
                 };
-
             }
-
-
-            if (
-                lower.includes("tamper")
-            ) {
-
-                return {
-
-                    type: "tamper",
-
-                    title:
-                        "🔴 SECURITY ALERT",
-
-                    message:
-                        "Camera tampering detected",
-
-                    voice:
-                        "Warning. Camera tampering detected."
-
-                };
-
-            }
-
 
             return null;
-
         }
 
-
-
-        function showSecurityPopup(
-            alert,
-            eventText
-        ) {
+        function showSecurityPopup(alert, eventText) {
 
             const popup =
-                document.getElementById(
-                    "securityPopup"
-                );
+                document.getElementById("securityPopup");
 
             const title =
-                document.getElementById(
-                    "securityPopupTitle"
-                );
+                document.getElementById("securityPopupTitle");
 
             const message =
-                document.getElementById(
-                    "securityPopupMessage"
-                );
+                document.getElementById("securityPopupMessage");
 
             const time =
-                document.getElementById(
-                    "securityPopupTime"
-                );
+                document.getElementById("securityPopupTime");
 
-
-            title.textContent =
-                alert.title;
-
-            message.textContent =
-                alert.message;
-
+            title.textContent = alert.title;
+            message.textContent = alert.message;
 
             const parts =
-                String(eventText).split(
-                    " - "
-                );
-
+                String(eventText).split(" - ");
 
             time.textContent =
                 parts.length > 1
                 ? parts[0]
                 : "Just now";
 
+            popup.classList.remove("known-alert");
 
-            popup.classList.remove(
-                "known-alert"
-            );
-
-
-            if (
-                alert.type === "known"
-            ) {
-
-                popup.classList.add(
-                    "known-alert"
-                );
-
+            if (alert.type === "known") {
+                popup.classList.add("known-alert");
             }
 
-
-            popup.classList.add(
-                "show"
-            );
-
+            popup.classList.add("show");
 
             if (popupTimer) {
-
-                clearTimeout(
-                    popupTimer
-                );
-
+                clearTimeout(popupTimer);
             }
-
 
             popupTimer =
                 setTimeout(
@@ -1627,51 +1699,36 @@
                     3000
                 );
 
-
-            speakAlert(
-                alert.voice
-            );
+            speakAlert(alert.voice);
 
         }
-
 
 
         function hideSecurityPopup() {
 
             const popup =
-                document.getElementById(
-                    "securityPopup"
-                );
+                document.getElementById("securityPopup");
 
-            popup.classList.remove(
-                "show"
-            );
-
-            popup.classList.remove(
-                "known-alert"
-            );
+            popup.classList.remove("show");
+            popup.classList.remove("known-alert");
 
         }
 
 
+        function updateCriticalAlerts(events) {
 
-        function updateCriticalAlerts(
-            events
-        ) {
-
-            if (
-                !events ||
-                events.length === 0
-            ) {
-
+            if (!events || events.length === 0) {
                 return;
-
             }
-
 
             const latestEvent =
                 String(events[0]);
 
+            /*
+             * Establish the current event on first load.
+             * This prevents an old alert from popping up just
+             * because the dashboard was refreshed.
+             */
 
             if (!eventsInitialized) {
 
@@ -1685,63 +1742,31 @@
 
             }
 
-
-            if (
-                latestEvent ===
-                lastCriticalEvent
-            ) {
-
+            if (latestEvent === lastCriticalEvent) {
                 return;
-
             }
-
 
             lastCriticalEvent =
                 latestEvent;
 
-
             const alert =
-                getCriticalAlert(
+                getCriticalAlert(latestEvent);
+            if (!canAlert(alert.type + ":" + alert.message)) {
+                return;
+            }
+            if (alert) {
+                showSecurityPopup(
+                    alert,
                     latestEvent
                 );
-
-
-            if (!alert) {
-                return;
             }
-
-
-            if (
-                !canAlert(
-                    alert.type +
-                    ":" +
-                    alert.message
-                )
-            ) {
-
-                return;
-
-            }
-
-
-            showSecurityPopup(
-                alert,
-                latestEvent
-            );
 
         }
 
 
-
-        /* =================================
-           VOICE
-        ================================= */
-
         function toggleVoice() {
 
-            if (
-                !("speechSynthesis" in window)
-            ) {
+            if (!("speechSynthesis" in window)) {
 
                 alert(
                     "Speech synthesis is not supported by this browser."
@@ -1751,21 +1776,14 @@
 
             }
 
-
             voiceEnabled =
                 !voiceEnabled;
 
-
             const button =
-                document.getElementById(
-                    "voiceButton"
-                );
+                document.getElementById("voiceButton");
 
             const status =
-                document.getElementById(
-                    "voiceStatus"
-                );
-
+                document.getElementById("voiceStatus");
 
             if (voiceEnabled) {
 
@@ -1775,6 +1793,7 @@
                 status.textContent =
                     "Voice enabled — alerts will be spoken";
 
+                /* User interaction unlocks speech on many phones. */
 
                 const welcome =
                     new SpeechSynthesisUtterance(
@@ -1784,12 +1803,8 @@
                 welcome.rate = 0.9;
                 welcome.volume = 1.0;
 
-
                 window.speechSynthesis.cancel();
-
-                window.speechSynthesis.speak(
-                    welcome
-                );
+                window.speechSynthesis.speak(welcome);
 
             }
 
@@ -1801,19 +1816,16 @@
                 status.textContent =
                     "Voice disabled — tap Enable Voice";
 
-                stopVoiceAlerts();
+                window.speechSynthesis.cancel();
 
             }
 
         }
 
 
-
         function testVoice() {
 
-            if (
-                !("speechSynthesis" in window)
-            ) {
+            if (!("speechSynthesis" in window)) {
 
                 alert(
                     "Speech synthesis is NOT supported by this browser."
@@ -1822,7 +1834,6 @@
                 return;
 
             }
-
 
             const message =
                 new SpeechSynthesisUtterance(
@@ -1833,15 +1844,10 @@
             message.pitch = 1.0;
             message.volume = 1.0;
 
-
             window.speechSynthesis.cancel();
-
-            window.speechSynthesis.speak(
-                message
-            );
+            window.speechSynthesis.speak(message);
 
         }
-
 
 
         /* =================================
@@ -1853,35 +1859,16 @@
             try {
 
                 const response =
-                    await fetch(
-                        "/api/events"
-                    );
-
+                    await fetch("/api/events");
 
                 if (!response.ok) {
-
-                    throw new Error(
-                        "Events request failed"
-                    );
-
+                    throw new Error("Events request failed");
                 }
-
 
                 const events =
                     await response.json();
 
-
-                /*
-                 * Keep the existing alert/voice
-                 * functionality active even though
-                 * the event list is no longer shown
-                 * on the main dashboard.
-                 */
-
-                updateCriticalAlerts(
-                    events
-                );
-
+                updateCriticalAlerts(events);
 
                 const container =
                     document.getElementById(
@@ -1926,10 +1913,131 @@
         }
 
 
-
         /* =================================
-           UPDATE RECORDINGS
+           UPDATE RECORDINGS (COLLAPSIBLE / DATE-WISE / MIN 1 MINUTE)
         ================================= */
+
+        let isRecordingsOpen = false;
+        let cachedRecordingsData = null;
+        let selectedRecordingsDate = "ALL";
+        let openDateGroups = {};
+
+        function toggleRecordingsPanel() {
+            isRecordingsOpen = !isRecordingsOpen;
+            const panel = document.getElementById("recordingsPanel");
+            const btnText = document.getElementById("recordingsBtnText");
+            const arrow = document.getElementById("recordingsArrowIcon");
+
+            if (panel) {
+                panel.style.display = isRecordingsOpen ? "block" : "none";
+            }
+            if (btnText) {
+                btnText.textContent = isRecordingsOpen ? "Hide Video Recordings" : "Show Video Recordings";
+            }
+            if (arrow) {
+                arrow.classList.toggle("open", isRecordingsOpen);
+            }
+
+            if (isRecordingsOpen && cachedRecordingsData) {
+                renderDatewiseRecordings(cachedRecordingsData);
+            }
+        }
+
+        function filterRecordingsBySelectedDate() {
+            const select = document.getElementById("recordingDateFilter");
+            if (select) {
+                selectedRecordingsDate = select.value;
+                if (cachedRecordingsData) {
+                    renderDatewiseRecordings(cachedRecordingsData);
+                }
+            }
+        }
+
+        function toggleDateGroup(dateKey) {
+            openDateGroups[dateKey] = !openDateGroups[dateKey];
+            const content = document.getElementById("group-content-" + dateKey);
+            const arrow = document.getElementById("group-arrow-" + dateKey);
+            if (content) {
+                content.style.display = openDateGroups[dateKey] ? "block" : "none";
+            }
+            if (arrow) {
+                arrow.textContent = openDateGroups[dateKey] ? "▲" : "▼";
+            }
+        }
+
+        function renderDatewiseRecordings(data) {
+            const container = document.getElementById("recordingsDateGroups");
+            if (!container) return;
+
+            const byDate = data.by_date || {};
+            let dates = Object.keys(byDate).sort().reverse();
+
+            if (selectedRecordingsDate !== "ALL") {
+                dates = dates.filter(d => d === selectedRecordingsDate);
+            }
+
+            if (dates.length === 0) {
+                container.innerHTML = '<div class="empty">No recordings found for this date.</div>';
+                return;
+            }
+
+            let html = "";
+            dates.forEach((dateKey, index) => {
+                const recs = byDate[dateKey] || [];
+                // Default first group to expanded
+                if (openDateGroups[dateKey] === undefined) {
+                    openDateGroups[dateKey] = (index === 0);
+                }
+                const isOpen = openDateGroups[dateKey];
+
+                html += `
+                    <div class="date-group">
+                        <div class="date-group-header" onclick="toggleDateGroup('${dateKey}')">
+                            <div class="date-group-title">
+                                <span>📅</span>
+                                <span>${dateKey}</span>
+                                <span class="recordings-count-badge">${recs.length} ${recs.length === 1 ? 'recording' : 'recordings'}</span>
+                            </div>
+                            <span id="group-arrow-${dateKey}" style="color:#94a3b8; font-size:12px;">${isOpen ? '▲' : '▼'}</span>
+                        </div>
+                        <div id="group-content-${dateKey}" class="date-group-items" style="display:${isOpen ? 'block' : 'none'};">
+                `;
+
+                recs.forEach(rec => {
+                    const encodedName = encodeURIComponent(rec.name);
+                    const formattedSize = formatFileSize(rec.size);
+                    const durStr = rec.duration_formatted || (rec.duration ? (rec.duration + 's') : '≥ 1 min');
+
+                    html += `
+                        <div class="recording-card">
+                            <div class="recording-info">
+                                <div class="recording-title">🎥 ${rec.name}</div>
+                                <div class="recording-meta-tags">
+                                    <span>🕒 ${rec.time || 'Time Recorded'}</span>
+                                    <span class="recording-duration-pill">⏱ ${durStr}</span>
+                                    <span>💾 ${formattedSize}</span>
+                                </div>
+                            </div>
+                            <div class="recording-buttons">
+                                <a class="watch-btn" href="/recordings/${encodedName}" target="_blank">
+                                    ▶ Play Video
+                                </a>
+                                <a class="download-btn" href="/recordings/${encodedName}" download>
+                                    ⬇ Download
+                                </a>
+                            </div>
+                        </div>
+                    `;
+                });
+
+                html += `
+                        </div>
+                    </div>
+                `;
+            });
+
+            container.innerHTML = html;
+        }
 
         async function updateRecordings() {
 
@@ -1942,114 +2050,38 @@
                     throw new Error("Recording request failed");
                 }
 
-                const recordings =
+                const data =
                     await response.json();
+                cachedRecordingsData = data;
 
-                const container =
-                    document.getElementById("recordingsList");
+                const total = data.total !== undefined ? data.total : (Array.isArray(data) ? data.length : (data.recordings ? data.recordings.length : 0));
 
-                if (!recordings || recordings.length === 0) {
-                    container.innerHTML =
-                        '<div class="empty">No recordings yet.</div>';
-                    return;
+                const totalBadge = document.getElementById("recordingsTotalBadge");
+                if (totalBadge) {
+                    totalBadge.textContent = total + (total === 1 ? " video" : " videos");
                 }
 
-                /* Group recordings by the hour they were created. */
-                const groups = {};
+                // Update date filter dropdown options if needed
+                const dateSelect = document.getElementById("recordingDateFilter");
+                if (dateSelect && data.dates) {
+                    const currentVal = dateSelect.value;
+                    const existingOpts = Array.from(dateSelect.options).map(o => o.value);
+                    const allDates = ["ALL", ...data.dates];
 
-                recordings.forEach(recording => {
-
-                    const timestamp = Number(recording.timestamp);
-                    const date =
-                        Number.isFinite(timestamp) && timestamp > 0
-                        ? new Date(timestamp * 1000)
-                        : null;
-
-                    let groupKey = "unknown";
-                    let groupLabel = "Unknown Time";
-
-                    if (date) {
-
-                        const year = date.getFullYear();
-                        const month = String(date.getMonth() + 1).padStart(2, "0");
-                        const day = String(date.getDate()).padStart(2, "0");
-                        const hour = String(date.getHours()).padStart(2, "0");
-
-                        groupKey = `${year}-${month}-${day}-${hour}`;
-
-                        groupLabel =
-                            date.toLocaleDateString(undefined, {
-                                day: "2-digit",
-                                month: "short",
-                                year: "numeric"
-                            }) +
-                            " — " +
-                            date.toLocaleTimeString(undefined, {
-                                hour: "numeric",
-                                hour12: true
-                            });
-                    }
-
-                    if (!groups[groupKey]) {
-                        groups[groupKey] = {
-                            label: groupLabel,
-                            recordings: []
-                        };
-                    }
-
-                    groups[groupKey].recordings.push(recording);
-                });
-
-                const sortedGroups =
-                    Object.entries(groups)
-                    .sort((a, b) => b[0].localeCompare(a[0]));
-
-                container.innerHTML =
-                    sortedGroups.map(([groupKey, group]) => {
-
-                        const recordingHtml =
-                            group.recordings.map(recording => {
-
-                                const filename =
-                                    encodeURIComponent(recording.name);
-
-                                const size =
-                                    formatFileSize(recording.size);
-
-                                return `
-                                    <div class="recording">
-                                        <span class="recording-name">
-                                            🎥 ${recording.name}
-                                            <small style="color:#77838f;">
-                                                (${size})
-                                            </small>
-                                        </span>
-
-                                        <a
-                                            class="watch-button"
-                                            href="/recordings/${filename}"
-                                            download
-                                        >
-                                            Download
-                                        </a>
-                                    </div>
-                                `;
-
+                    if (existingOpts.join(",") !== allDates.join(",")) {
+                        dateSelect.innerHTML = '<option value="ALL">All Dates (' + total + ')</option>' +
+                            data.dates.map(d => {
+                                const count = (data.by_date[d] || []).length;
+                                return `<option value="${d}">${d} (${count})</option>`;
                             }).join("");
+                        dateSelect.value = currentVal && allDates.includes(currentVal) ? currentVal : "ALL";
+                    }
+                }
 
-                        return `
-                            <div
-                                class="recording-hour-group"
-                                data-hour="${groupKey}"
-                            >
-                                <div class="recording-hour">
-                                    🕐 ${group.label}
-                                </div>
-                                ${recordingHtml}
-                            </div>
-                        `;
-
-                    }).join("");
+                // Render if panel is open
+                if (isRecordingsOpen) {
+                    renderDatewiseRecordings(data);
+                }
 
             }
 
@@ -2071,29 +2103,16 @@
 
         function formatFileSize(bytes) {
 
-            if (
-                !bytes ||
-                bytes <= 0
-            ) {
-
+            if (!bytes || bytes <= 0) {
                 return "0 KB";
-
             }
 
-
             const units =
-                [
-                    "Bytes",
-                    "KB",
-                    "MB",
-                    "GB"
-                ];
-
+                ["Bytes", "KB", "MB", "GB"];
 
             let index = 0;
 
             let size = bytes;
-
 
             while (
                 size >= 1024 &&
@@ -2101,11 +2120,9 @@
             ) {
 
                 size /= 1024;
-
                 index++;
 
             }
-
 
             return (
                 size.toFixed(1) +
@@ -2114,7 +2131,6 @@
             );
 
         }
-
 
 
         /* =================================
@@ -2128,12 +2144,10 @@
                     "reportDate"
                 );
 
-
             const message =
                 document.getElementById(
                     "reportMessage"
                 );
-
 
             const button =
                 document.getElementById(
@@ -2177,7 +2191,6 @@
                     await fetch(
                         "/api/generate-report",
                         {
-
                             method: "POST",
 
                             headers: {
@@ -2188,7 +2201,6 @@
                             body: JSON.stringify({
                                 date: selectedDate
                             })
-
                         }
                     );
 
@@ -2220,24 +2232,33 @@
                 }
 
 
-                message.textContent =
-                    "✓ Report generated successfully.";
-
-                message.style.color =
-                    "#36d17c";
-
-
                 const reportUrl =
                     "/reports/" +
                     encodeURIComponent(
                         result.filename
                     );
 
+                message.innerHTML =
+                    `<div style="margin-top:10px; display:flex; align-items:center; gap:12px; flex-wrap:wrap;">` +
+                    `<span style="color:#36d17c; font-weight:bold;">✓ PDF Report generated with embedded visual analytics!</span>` +
+                    `<a href="${reportUrl}" download="${result.filename}" class="pill-btn active" style="text-decoration:none; display:inline-flex; align-items:center; gap:6px; padding:7px 14px; background:#2563eb; color:#ffffff; border-radius:6px; font-weight:600; font-size:13px;">` +
+                    `📥 Download PDF (${result.filename})` +
+                    `</a>` +
+                    `</div>`;
 
-                window.open(
-                    reportUrl,
-                    "_blank"
-                );
+                /*
+                 * Trigger direct download and open in new tab
+                 */
+                try {
+                    const downloadLink = document.createElement("a");
+                    downloadLink.href = reportUrl;
+                    downloadLink.download = result.filename;
+                    document.body.appendChild(downloadLink);
+                    downloadLink.click();
+                    document.body.removeChild(downloadLink);
+                } catch (e) {
+                    window.open(reportUrl, "_blank");
+                }
 
             }
 
@@ -2248,7 +2269,6 @@
                     "Report generation error:",
                     error
                 );
-
 
                 message.textContent =
                     "Report generation failed.";
@@ -2271,7 +2291,6 @@
         }
 
 
-
         /* =================================
            SET TODAY'S DATE
         ================================= */
@@ -2285,32 +2304,21 @@
                         "reportDate"
                     );
 
-
                 const today =
                     new Date();
-
 
                 const year =
                     today.getFullYear();
 
-
                 const month =
                     String(
                         today.getMonth() + 1
-                    ).padStart(
-                        2,
-                        "0"
-                    );
-
+                    ).padStart(2, "0");
 
                 const day =
                     String(
                         today.getDate()
-                    ).padStart(
-                        2,
-                        "0"
-                    );
-
+                    ).padStart(2, "0");
 
                 dateInput.value =
                     `${year}-${month}-${day}`;
@@ -2319,22 +2327,15 @@
         );
 
 
-
         /* =================================
            CAMERA STREAM CHECK
         ================================= */
 
         const liveCamera =
-            document.getElementById(
-                "liveCamera"
-            );
-
+            document.getElementById("liveCamera");
 
         const cameraHelp =
-            document.getElementById(
-                "cameraHelp"
-            );
-
+            document.getElementById("cameraHelp");
 
         if (liveCamera) {
 
@@ -2347,7 +2348,6 @@
 
                 }
             );
-
 
             liveCamera.addEventListener(
                 "load",
@@ -2362,7 +2362,6 @@
         }
 
 
-
         /* =================================
            AUTO REFRESH
         ================================= */
@@ -2372,33 +2371,15 @@
             1000
         );
 
-
-        /*
-         * Events are still checked every second
-         * so the existing security popup and
-         * voice alerts continue working.
-         *
-         * The list itself is only visible on
-         * the separate Events view.
-         */
-
         setInterval(
             updateEvents,
             1000
         );
 
-
-        /*
-         * Recordings are refreshed every 3 seconds.
-         * They are displayed only on the separate
-         * Recordings view.
-         */
-
         setInterval(
             updateRecordings,
             3000
         );
-
 
 
         /* =================================
@@ -2412,6 +2393,263 @@
         updateRecordings();
 
 
+    
+        /* ============================================================
+           SIREN DETERRENT SYSTEM & WEB AUDIO (EXAMINER RECOMMENDATION 4)
+        ============================================================ */
+        let browserSirenAudioCtx = null;
+        let browserSirenOsc = null;
+        let browserSirenGain = null;
+        let browserSirenInterval = null;
+        let isBrowserSirenPlaying = false;
+
+        function initBrowserSiren() {
+            if (!browserSirenAudioCtx) {
+                const AudioCtx = window.AudioContext || window.webkitAudioContext;
+                if (AudioCtx) {
+                    browserSirenAudioCtx = new AudioCtx();
+                }
+            }
+        }
+
+        function playBrowserSiren() {
+            if (isBrowserSirenPlaying) return;
+            try {
+                initBrowserSiren();
+                if (!browserSirenAudioCtx) return;
+                if (browserSirenAudioCtx.state === 'suspended') {
+                    browserSirenAudioCtx.resume();
+                }
+                isBrowserSirenPlaying = true;
+                browserSirenOsc = browserSirenAudioCtx.createOscillator();
+                browserSirenGain = browserSirenAudioCtx.createGain();
+                browserSirenOsc.type = 'sawtooth';
+                browserSirenGain.gain.setValueAtTime(0.18, browserSirenAudioCtx.currentTime);
+
+                let high = false;
+                browserSirenOsc.frequency.setValueAtTime(750, browserSirenAudioCtx.currentTime);
+                browserSirenInterval = setInterval(() => {
+                    if (!isBrowserSirenPlaying || !browserSirenOsc) return;
+                    high = !high;
+                    const targetFreq = high ? 1150 : 750;
+                    try {
+                        browserSirenOsc.frequency.linearRampToValueAtTime(targetFreq, browserSirenAudioCtx.currentTime + 0.15);
+                    } catch(e) {}
+                }, 300);
+
+                browserSirenOsc.connect(browserSirenGain);
+                browserSirenGain.connect(browserSirenAudioCtx.destination);
+                browserSirenOsc.start();
+            } catch(e) {
+                console.warn("Browser siren error:", e);
+            }
+        }
+
+        function stopBrowserSiren() {
+            if (!isBrowserSirenPlaying) return;
+            isBrowserSirenPlaying = false;
+            if (browserSirenInterval) {
+                clearInterval(browserSirenInterval);
+                browserSirenInterval = null;
+            }
+            try {
+                if (browserSirenOsc) {
+                    browserSirenOsc.stop();
+                    browserSirenOsc.disconnect();
+                    browserSirenOsc = null;
+                }
+            } catch(e) {}
+        }
+
+        async function triggerSirenTest() {
+            try {
+                initBrowserSiren();
+                playBrowserSiren();
+                await fetch('/api/siren/trigger', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({reason: 'MANUAL SIREN TEST', duration: 8.0})
+                });
+                updateStatus();
+            } catch(e) {
+                console.error("Test siren error:", e);
+            }
+        }
+
+        async function muteSiren() {
+            stopBrowserSiren();
+            try {
+                await fetch('/api/siren/mute', {method: 'POST'});
+                const banner = document.getElementById("sirenEmergencyBanner");
+                if (banner) banner.style.display = "none";
+                const sirenEl = document.getElementById("sirenStatus");
+                if (sirenEl) { sirenEl.textContent = "SILENCED"; sirenEl.className = "status-value warning"; }
+                const sirenBadge = document.getElementById("sirenBadge");
+                if (sirenBadge) { sirenBadge.textContent = "SILENCED"; sirenBadge.style.color = "#f59e0b"; }
+                updateStatus();
+            } catch(e) {
+                console.error("Mute siren error:", e);
+            }
+        }
+
+        /* ============================================================
+           INTELLIGENT QUERY ENGINE (EXAMINER RECOMMENDATION 1)
+        ============================================================ */
+        function setQuery(queryText) {
+            const input = document.getElementById('queryInput');
+            if (input) {
+                input.value = queryText;
+                executeQuery();
+            }
+        }
+
+        function closeQueryAnswer() {
+            const card = document.getElementById('queryAnswerCard');
+            if (card) card.style.display = 'none';
+        }
+
+        async function executeQuery() {
+            const input = document.getElementById('queryInput');
+            const q = input ? input.value.trim() : '';
+            if (!q) return;
+
+            const card = document.getElementById('queryAnswerCard');
+            const textEl = document.getElementById('queryAnswerText');
+            const metricsEl = document.getElementById('queryMetricsRow');
+            const tableWrap = document.getElementById('queryTableWrap');
+            const table = document.getElementById('queryTable');
+
+            if (card) card.style.display = 'block';
+            if (textEl) textEl.textContent = 'Processing query with SENTRIX Intelligence Engine...';
+            if (metricsEl) metricsEl.innerHTML = '';
+            if (tableWrap) tableWrap.style.display = 'none';
+
+            try {
+                const res = await fetch('/api/query', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ query: q })
+                });
+                const data = await res.json();
+
+                if (!data.success) {
+                    textEl.textContent = 'Error: ' + (data.error || 'Could not process query.');
+                    return;
+                }
+
+                textEl.textContent = data.answer || 'Query completed.';
+
+                // Render metrics badges
+                if (data.metrics && metricsEl) {
+                    metricsEl.innerHTML = '';
+                    for (const [k, v] of Object.entries(data.metrics)) {
+                        const badge = document.createElement('div');
+                        badge.className = 'query-metric-badge';
+                        const label = k.replace(/_/g, ' ').toUpperCase();
+                        badge.innerHTML = `${label}: <strong>${v}</strong>`;
+                        metricsEl.appendChild(badge);
+                    }
+                }
+
+                // Render table
+                if (data.table && data.table.columns && data.table.rows && data.table.rows.length > 0 && table) {
+                    let htmlTable = '<thead><tr>';
+                    data.table.columns.forEach(col => {
+                        htmlTable += `<th>${col}</th>`;
+                    });
+                    htmlTable += '</tr></thead><tbody>';
+                    data.table.rows.forEach(row => {
+                        htmlTable += '<tr>';
+                        row.forEach(cell => {
+                            htmlTable += `<td>${cell}</td>`;
+                        });
+                        htmlTable += '</tr>';
+                    });
+                    htmlTable += '</tbody>';
+                    table.innerHTML = htmlTable;
+                    tableWrap.style.display = 'block';
+                } else if (tableWrap) {
+                    tableWrap.style.display = 'none';
+                }
+            } catch (err) {
+                textEl.textContent = 'Network or query error: ' + err;
+            }
+        }
+
+
+        /* ============================================================
+           MONITORED OBJECT UPLOAD & MANAGEMENT
+        ============================================================ */
+        function acknowledgeObjectAlert() {
+            const banner = document.getElementById("objectAlertBanner");
+            if (banner) banner.style.display = "none";
+        }
+
+        async function uploadObjectToMonitor() {
+            const fileInput = document.getElementById("objectImageFile");
+            const statusMsg = document.getElementById("uploadStatusMsg");
+            if (!fileInput || !fileInput.files || fileInput.files.length === 0) {
+                alert("Please select an image file of the object first.");
+                return;
+            }
+
+            const file = fileInput.files[0];
+            const formData = new FormData();
+            formData.append("file", file);
+
+            if (statusMsg) {
+                statusMsg.textContent = "Uploading and registering object...";
+                statusMsg.style.color = "#38bdf8";
+            }
+
+            try {
+                const res = await fetch("/api/object-monitor/upload", {
+                    method: "POST",
+                    body: formData
+                });
+                const data = await res.json();
+                if (data.success) {
+                    if (statusMsg) {
+                        statusMsg.textContent = "Object registered successfully! Monitoring active.";
+                        statusMsg.style.color = "#36d17c";
+                    }
+                    const thumb = document.getElementById("monitoredObjectThumb");
+                    if (thumb) {
+                        thumb.src = "/api/object-monitor/image?t=" + new Date().getTime();
+                    }
+                    fileInput.value = "";
+                    setTimeout(() => { if (statusMsg) statusMsg.textContent = ""; }, 4000);
+                    updateStatus();
+                } else {
+                    if (statusMsg) {
+                        statusMsg.textContent = "Upload failed: " + (data.error || "Unknown error");
+                        statusMsg.style.color = "#ef4444";
+                    }
+                }
+            } catch(e) {
+                if (statusMsg) {
+                    statusMsg.textContent = "Upload error: " + e;
+                    statusMsg.style.color = "#ef4444";
+                }
+            }
+        }
+
+        async function clearMonitoredObject() {
+            if (!confirm("Are you sure you want to stop monitoring this object?")) return;
+            try {
+                const res = await fetch("/api/object-monitor/clear", { method: "POST" });
+                const data = await res.json();
+                const statusMsg = document.getElementById("uploadStatusMsg");
+                if (statusMsg) {
+                    statusMsg.textContent = "Monitored object removed.";
+                    statusMsg.style.color = "#cbd5e1";
+                    setTimeout(() => { if (statusMsg) statusMsg.textContent = ""; }, 3000);
+                }
+                updateStatus();
+            } catch(e) {
+                console.error("Clear object error:", e);
+            }
+        }
     </script>
 
 

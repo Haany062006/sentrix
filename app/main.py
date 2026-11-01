@@ -10,12 +10,13 @@ from keras_facenet import FaceNet
 from app.motion.detector import MotionDetector
 from app.face.recognizer import load_registered_faces, recognize_face
 from app.tamper.detector import TamperDetector
+from app.tamper.siren import siren_manager
+from app.object_monitor import object_monitor
 
 from app.database.db import (
     add_event as add_database_event,
     add_recording,
-    add_tamper_event,
-    cleanup_old_recording_files
+    add_tamper_event
 )
 
 from app.dashboard.dashboard import (
@@ -31,9 +32,8 @@ from app.dashboard.dashboard import (
 # ============================================================
 
 POST_MOTION_SECONDS = 10
-MOTION_CONFIRMATION_SECONDS = 1.0
-MIN_RECORDING_SECONDS = 5.0
-EVENT_COOLDOWN = 5
+MIN_RECORDING_SECONDS = 60.0  # Minimum 1 minute (60 seconds) recording duration
+EVENT_COOLDOWN = 5  # Default cooldown; recognition/tamper events use longer cooldowns
 OUTPUT_FOLDER = "recordings"
 
 os.makedirs(OUTPUT_FOLDER, exist_ok=True)
@@ -58,7 +58,10 @@ def log_event(
     tamper_type=None,
     brightness=None,
     blur_variance=None,
-    histogram_correlation=None
+    histogram_correlation=None,
+    event_type=None,
+    cooldown=None,
+    **kwargs
 ):
     """
     Logs events to:
@@ -74,15 +77,21 @@ def log_event(
 
     current_time = time.time()
 
-    # Event cooldown
+    # Use specified cooldown if provided, else use defaults
+    if cooldown is not None:
+        event_cooldown = float(cooldown)
+    elif event_key.startswith("recognized_") or event_key == "unknown_person":
+        event_cooldown = 60
+    elif event_key.startswith("tamper_"):
+        event_cooldown = 60
+    elif event_key == "obj_missing_alert":
+        event_cooldown = 15
+    else:
+        event_cooldown = EVENT_COOLDOWN
+
     if event_key in last_event_times:
-
-        elapsed = (
-            current_time -
-            last_event_times[event_key]
-        )
-
-        if elapsed < EVENT_COOLDOWN:
+        elapsed = current_time - last_event_times[event_key]
+        if elapsed < event_cooldown:
             return
 
     last_event_times[event_key] = current_time
@@ -122,35 +131,27 @@ def log_event(
 
     try:
 
-        message_lower = message.lower()
+        if event_type is None:
+            message_lower = message.lower()
 
-        if "motion detected" in message_lower:
-
-            event_type = "motion"
-
-        elif "tamper detected" in message_lower:
-
-            event_type = "tamper"
-
-        elif "unknown person" in message_lower:
-
-            event_type = "unknown_person"
-
-        elif "recognized" in message_lower:
-
-            event_type = "face_recognized"
-
-        elif "recording started" in message_lower:
-
-            event_type = "recording_start"
-
-        elif "recording stopped" in message_lower:
-
-            event_type = "recording_stop"
-
-        else:
-
-            event_type = "system"
+            if "motion detected" in message_lower:
+                event_type = "motion"
+            elif "siren" in message_lower:
+                event_type = "siren_trigger"
+            elif "tamper detected" in message_lower:
+                event_type = "tamper"
+            elif "unknown person" in message_lower:
+                event_type = "unknown_person"
+            elif "recognized" in message_lower:
+                event_type = "face_recognized"
+            elif "recording started" in message_lower:
+                event_type = "recording_start"
+            elif "recording stopped" in message_lower:
+                event_type = "recording_stop"
+            elif "monitored object" in message_lower or "missing alert" in message_lower:
+                event_type = "object_alert"
+            else:
+                event_type = "system"
 
         add_database_event(
             event_type=event_type,
@@ -205,7 +206,9 @@ def send_dashboard_status(
     people=None,
     tamper="CAMERA OK",
     tampering=False,
-    recording=False
+    recording=False,
+    siren=False,
+    object_monitor_status=None
 ):
 
     if people is None:
@@ -237,6 +240,16 @@ def send_dashboard_status(
 
         "recording": bool(
             recording
+        ),
+
+        "siren": bool(
+            siren
+        ),
+
+        "object_monitor": (
+            object_monitor_status
+            if object_monitor_status is not None
+            else object_monitor.get_status()
         )
     }
 
@@ -258,6 +271,24 @@ def send_dashboard_status(
 # MAIN SENTRIX ENGINE
 # ============================================================
 
+def finalize_mp4(temp_path, final_path):
+    """Validate a closed MP4 and publish it under its final filename."""
+    try:
+        if not temp_path or not os.path.isfile(temp_path) or os.path.getsize(temp_path) < 1024:
+            return False
+        check = cv2.VideoCapture(temp_path)
+        opened = check.isOpened()
+        ok, first_frame = check.read() if opened else (False, None)
+        check.release()
+        if not opened or not ok or first_frame is None:
+            return False
+        os.replace(temp_path, final_path)
+        return os.path.isfile(final_path) and os.path.getsize(final_path) >= 1024
+    except Exception as exc:
+        print("Video finalization error:", exc)
+        return False
+
+
 def run_sentrix():
 
     print()
@@ -273,7 +304,7 @@ def run_sentrix():
     print(
         "Opening camera..."
     )
-    cleanup_old_recording_files(days=15)
+
     camera = cv2.VideoCapture(
         0,
         cv2.CAP_MSMF
@@ -312,6 +343,15 @@ def run_sentrix():
     print(
         "Camera opened successfully."
     )
+
+    # Reduce camera latency and avoid processing a backlog of old frames.
+    try:
+        camera.set(cv2.CAP_PROP_BUFFERSIZE, 1)
+        camera.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
+        camera.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
+        camera.set(cv2.CAP_PROP_FPS, 30)
+    except Exception:
+        pass
 
     print()
 
@@ -495,16 +535,105 @@ def run_sentrix():
 
     current_recording_path = None
 
-    recording_start_time = None
+    current_recording_temp_path = None
 
-    # Motion must remain detected for this long before recording starts.
-    motion_candidate_start_time = None
+    recording_start_time = None
 
     # ========================================================
     # CURRENT TAMPER STATUS
     # ========================================================
 
     current_tamper_status = "CAMERA OK"
+    # Tracks status transitions so the same tamper alert is not logged every few seconds.
+    last_logged_tamper_status = "CAMERA OK"
+
+    # Run expensive tamper analysis at most five times per second.
+    # Reuse the latest result between checks to reduce processing overhead.
+    TAMPER_CHECK_INTERVAL = 0.20
+    last_tamper_check_time = 0.0
+    cached_tamper_result = {
+        "tampering": False,
+        "status": "CAMERA OK",
+        "brightness": 0.0,
+        "blur_variance": 0.0,
+        "histogram_correlation": 1.0
+    }
+
+    # Face inference runs in a worker thread so MTCNN/FaceNet do not block
+    # camera capture, recording, or dashboard refresh.
+    face_state_lock = threading.Lock()
+    face_input = {"frame": None, "version": 0}
+    face_output = {"version": -1, "faces": []}
+    face_worker_stop = threading.Event()
+
+    def face_inference_worker():
+        last_version = -1
+        while not face_worker_stop.is_set():
+            with face_state_lock:
+                version = face_input["version"]
+                sample = face_input["frame"]
+                known_faces = registered_faces
+
+            if sample is None or version == last_version:
+                face_worker_stop.wait(0.015)
+                continue
+
+            last_version = version
+            try:
+                # MTCNN and FaceNet both use RGB input. Keep the same colour
+                # format for detection, cropping, registration, and recognition.
+                sample_rgb = cv2.cvtColor(sample, cv2.COLOR_BGR2RGB)
+                detections = face_detector.detect_faces(sample_rgb) or []
+                faces = []
+                sample_h, sample_w = sample_rgb.shape[:2]
+
+                for detection in detections:
+                    if float(detection.get("confidence", 0.0)) < 0.90:
+                        continue
+                    x, y, w, h = map(int, detection.get("box", (0, 0, 0, 0)))
+                    x = max(0, x); y = max(0, y)
+                    x2 = min(sample_w, x + w); y2 = min(sample_h, y + h)
+                    if x2 <= x or y2 <= y:
+                        continue
+                    # IMPORTANT: crop from RGB frame, not the original BGR frame.
+                    face_crop = sample_rgb[y:y2, x:x2]
+                    if face_crop.size == 0:
+                        continue
+                    try:
+                        name, score = recognize_face(face_crop, embedder, known_faces)
+                    except Exception as exc:
+                        print("Face recognition error:", exc)
+                        name, score = "ERROR", 0.0
+
+                    if name == "UNKNOWN":
+                        display_name, label, color = "Unknown Person", f"Unknown ({score:.2f})", (0, 0, 255)
+                        log_event(f"Unknown person detected ({score:.2f})", "unknown_person", confidence=score)
+                    elif name == "ERROR":
+                        display_name, label, color = "Recognition Error", "Recognition Error", (0, 255, 255)
+                    else:
+                        display_name, label, color = name, f"{name} ({score:.2f})", (0, 255, 0)
+                        log_event(f"{name} recognized ({score:.2f})", f"recognized_{name}", person_name=name, confidence=score)
+
+                    faces.append((x, y, x2, y2, label, color, display_name))
+
+                with face_state_lock:
+                    face_output["version"] = version
+                    face_output["faces"] = faces
+            except Exception as exc:
+                print("Face detection worker error:", exc)
+                with face_state_lock:
+                    face_output["version"] = version
+                    face_output["faces"] = []
+
+            # Keep the detector responsive without repeatedly processing the same frame.
+            face_worker_stop.wait(0.12)
+
+    face_worker_thread = threading.Thread(
+        target=face_inference_worker, name="SentriX-FaceWorker", daemon=True
+    )
+    face_worker_thread.start()
+    last_dashboard_frame_update = 0.0
+    DASHBOARD_FRAME_INTERVAL = 1.0 / 15.0  # Keep web dashboard smooth without overloading Flask.
 
     # ========================================================
     # INITIAL DASHBOARD STATUS
@@ -644,404 +773,116 @@ def run_sentrix():
 
             last_motion_time = time.time()
 
-            # Do not start a recording from a single brief motion detection.
-            # Motion must remain detected for MOTION_CONFIRMATION_SECONDS.
-            if not recording:
-
-                if motion_candidate_start_time is None:
-
-                    motion_candidate_start_time = time.time()
-
             log_event(
                 "Motion detected",
                 "motion"
             )
 
-        elif not recording:
-
-            # Brief motion disappeared before confirmation.
-            motion_candidate_start_time = None
-
         # ====================================================
-        # TAMPER DETECTION
+        # TAMPER DETECTION (THROTTLED)
         # ====================================================
 
-        tamper_detected = False
+        current_time = time.time()
 
-        current_tamper_status = "CAMERA OK"
-
-        tamper_brightness = None
-
-        tamper_blur_variance = None
-
-        tamper_histogram_correlation = None
-
-        if tamper_detector is not None:
-
+        if (
+            tamper_detector is not None
+            and current_time - last_tamper_check_time >= TAMPER_CHECK_INTERVAL
+        ):
             try:
+                tamper_result = tamper_detector.detect(frame)
+                last_tamper_check_time = current_time
 
-                tamper_result = (
-                    tamper_detector.detect(
-                        frame
-                    )
-                )
-
-                if isinstance(
-                    tamper_result,
-                    dict
-                ):
-
-                    tamper_detected = bool(
-                        tamper_result.get(
-                            "tampering",
-                            False
-                        )
-                    )
-
-                    current_tamper_status = (
-                        tamper_result.get(
-                            "status",
-                            "CAMERA OK"
-                        )
-                    )
-
-                    tamper_brightness = (
-                        tamper_result.get(
-                            "brightness"
-                        )
-                    )
-
-                    tamper_blur_variance = (
-                        tamper_result.get(
-                            "blur_variance"
-                        )
-                    )
-
-                    tamper_histogram_correlation = (
-                        tamper_result.get(
-                            "histogram_correlation"
-                        )
-                    )
-
+                if isinstance(tamper_result, dict):
+                    cached_tamper_result = {
+                        "tampering": bool(tamper_result.get("tampering", False)),
+                        "status": str(tamper_result.get("status", "CAMERA OK")),
+                        "brightness": tamper_result.get("brightness"),
+                        "blur_variance": tamper_result.get("blur_variance"),
+                        "histogram_correlation": tamper_result.get("histogram_correlation")
+                    }
                 else:
-
-                    current_tamper_status = str(
-                        tamper_result
-                    )
-
-                # --------------------------------------------
-                # TAMPER EVENT
-                # --------------------------------------------
-
-                if tamper_detected:
-
-                    log_event(
-                        f"Tamper detected: {current_tamper_status}",
-                        event_key=f"tamper_{current_tamper_status}",
-                        tamper_type=current_tamper_status,
-                        brightness=tamper_brightness,
-                        blur_variance=tamper_blur_variance,
-                        histogram_correlation=tamper_histogram_correlation
-                    )
-                        
+                    cached_tamper_result = {
+                        "tampering": str(tamper_result) != "CAMERA OK",
+                        "status": str(tamper_result),
+                        "brightness": None,
+                        "blur_variance": None,
+                        "histogram_correlation": None
+                    }
 
             except Exception as e:
+                print("Tamper detection error:", e)
+                # Keep the last valid result if a check fails.
 
-                print(
-                    "Tamper detection error:",
-                    e
-                )
+        tamper_detected = bool(cached_tamper_result.get("tampering", False))
+        current_tamper_status = str(
+            cached_tamper_result.get("status", "CAMERA OK")
+        )
+        tamper_brightness = cached_tamper_result.get("brightness")
+        tamper_blur_variance = cached_tamper_result.get("blur_variance")
+        tamper_histogram_correlation = cached_tamper_result.get(
+            "histogram_correlation"
+        )
 
-        # ====================================================
-        # FACE DETECTION
-        # ====================================================
-
-        try:
-
-            detections = (
-                face_detector.detect_faces(
-                    rgb_frame
-                )
-            )
-
-        except Exception as e:
-
-            print(
-                "Face detection error:",
-                e
-            )
-
-            detections = []
-
-        # ====================================================
-        # PERSON STATUS
-        # ====================================================
-
-        face_detected = False
-
-        detected_people = []
-
-        # ====================================================
-        # PROCESS FACES
-        # ====================================================
-
-        for detection in detections:
-
+        # Trigger siren on camera tampering (lens covered, blur, camera moved)
+        if tamper_detected:
             try:
+                siren_manager.trigger(
+                    reason=f"TAMPER: {current_tamper_status}",
+                    duration=10.0
+                )
+            except Exception as siren_err:
+                print("Siren trigger error:", siren_err)
+        else:
+            if current_tamper_status == "CAMERA OK" and siren_manager.is_active():
+                siren_manager.stop()
 
-                # --------------------------------------------
-                # MTCNN CONFIDENCE
-                # --------------------------------------------
-
-                detection_confidence = (
-                    detection.get(
-                        "confidence",
-                        0
-                    )
+        # Log only when the reported tamper status changes.
+        if current_tamper_status != last_logged_tamper_status:
+            if tamper_detected:
+                log_event(
+                    f"Tamper detected: {current_tamper_status} (Siren Triggered)",
+                    event_key=f"tamper_{current_tamper_status}",
+                    tamper_type=current_tamper_status,
+                    brightness=tamper_brightness,
+                    blur_variance=tamper_blur_variance,
+                    histogram_correlation=tamper_histogram_correlation
+                )
+            elif last_logged_tamper_status != "CAMERA OK":
+                log_event(
+                    "Camera tampering cleared",
+                    event_key="tamper_cleared"
                 )
 
-                if detection_confidence < 0.90:
+            last_logged_tamper_status = current_tamper_status
 
-                    continue
+        # ====================================================
+        # ASYNCHRONOUS FACE DETECTION / DISPLAY
+        # ====================================================
 
-                # --------------------------------------------
-                # FACE BOUNDING BOX
-                # --------------------------------------------
+        # Publish the newest frame; the worker always skips stale frames.
+        with face_state_lock:
+            face_input["frame"] = frame.copy()
+            face_input["version"] += 1
+            faces_to_draw = list(face_output["faces"])
 
-                x, y, w, h = (
-                    detection["box"]
-                )
+        face_detected = bool(faces_to_draw)
+        detected_people = list(dict.fromkeys(face[6] for face in faces_to_draw))
 
-                x = max(
-                    0,
-                    x
-                )
-
-                y = max(
-                    0,
-                    y
-                )
-
-                x2 = min(
-                    frame_width,
-                    x + w
-                )
-
-                y2 = min(
-                    frame_height,
-                    y + h
-                )
-
-                if x2 <= x or y2 <= y:
-
-                    continue
-
-                # --------------------------------------------
-                # FACE IMAGE
-                # --------------------------------------------
-
-                face_image = frame[
-                    y:y2,
-                    x:x2
-                ]
-
-                if face_image.size == 0:
-
-                    continue
-
-                face_detected = True
-
-                # --------------------------------------------
-                # FACE RECOGNITION
-                # --------------------------------------------
-
-                try:
-
-                    name, score = (
-                        recognize_face(
-                            face_image,
-                            embedder,
-                            registered_faces
-                        )
-                    )
-
-                except Exception as e:
-
-                    print(
-                        "Face recognition error:",
-                        e
-                    )
-
-                    name = "ERROR"
-
-                    score = 0.0
-
-                # --------------------------------------------
-                # UNKNOWN PERSON
-                # --------------------------------------------
-
-                if name == "UNKNOWN":
-
-                    person_display_name = (
-                        "Unknown Person"
-                    )
-
-                    if (
-                        person_display_name
-                        not in detected_people
-                    ):
-
-                        detected_people.append(
-                            person_display_name
-                        )
-
-                    box_color = (
-                        0,
-                        0,
-                        255
-                    )
-
-                    label = (
-                        f"Unknown "
-                        f"({score:.2f})"
-                    )
-
-                    log_event(
-                        (
-                            f"Unknown person detected "
-                            f"({score:.2f})"
-                        ),
-                        "unknown_person",
-                        confidence=score
-                    )
-
-                # --------------------------------------------
-                # RECOGNITION ERROR
-                # --------------------------------------------
-
-                elif name == "ERROR":
-
-                    person_display_name = (
-                        "Recognition Error"
-                    )
-
-                    if (
-                        person_display_name
-                        not in detected_people
-                    ):
-
-                        detected_people.append(
-                            person_display_name
-                        )
-
-                    box_color = (
-                        0,
-                        255,
-                        255
-                    )
-
-                    label = (
-                        "Recognition Error"
-                    )
-
-                # --------------------------------------------
-                # KNOWN PERSON
-                # --------------------------------------------
-
-                else:
-
-                    person_display_name = (
-                        name
-                    )
-
-                    if (
-                        person_display_name
-                        not in detected_people
-                    ):
-
-                        detected_people.append(
-                            person_display_name
-                        )
-
-                    box_color = (
-                        0,
-                        255,
-                        0
-                    )
-
-                    label = (
-                        f"{name} "
-                        f"({score:.2f})"
-                    )
-
-                    log_event(
-                        (
-                            f"{name} recognized "
-                            f"({score:.2f})"
-                        ),
-                        f"recognized_{name}",
-                        person_name=name,
-                        confidence=score
-                    )
-
-                # --------------------------------------------
-                # DRAW FACE BOX
-                # --------------------------------------------
-
-                cv2.rectangle(
-                    frame,
-                    (x, y),
-                    (x2, y2),
-                    box_color,
-                    2
-                )
-
-                # --------------------------------------------
-                # DRAW NAME
-                # --------------------------------------------
-
-                cv2.putText(
-                    frame,
-                    label,
-                    (
-                        x,
-                        max(
-                            30,
-                            y - 10
-                        )
-                    ),
-                    cv2.FONT_HERSHEY_SIMPLEX,
-                    0.65,
-                    box_color,
-                    2
-                )
-
-            except Exception as e:
-
-                print(
-                    "Face processing error:",
-                    e
-                )
+        for x, y, x2, y2, label, box_color, _person_name in faces_to_draw:
+            cv2.rectangle(frame, (x, y), (x2, y2), box_color, 2)
+            cv2.putText(
+                frame, label, (x, max(30, y - 10)),
+                cv2.FONT_HERSHEY_SIMPLEX, 0.65, box_color, 2
+            )
 
         # ====================================================
         # START RECORDING
         # ====================================================
 
-        motion_confirmed = (
+        if (
             motion_detected
             and not recording
-            and motion_candidate_start_time is not None
-            and (
-                time.time()
-                - motion_candidate_start_time
-                >= MOTION_CONFIRMATION_SECONDS
-            )
-        )
-
-        if motion_confirmed:
-
-            # Reset the candidate because recording is now starting.
-            motion_candidate_start_time = None
+        ):
 
             timestamp = (
                 datetime.now().strftime(
@@ -1049,25 +890,14 @@ def run_sentrix():
                 )
             )
 
-            current_recording_path = (
-                os.path.join(
-                    OUTPUT_FOLDER,
-                    (
-                        f"SENTRIX_"
-                        f"{timestamp}.mp4"
-                    )
-                )
-            )
+            current_recording_path = os.path.join(OUTPUT_FOLDER, f"SENTRIX_{timestamp}.mp4")
+            current_recording_temp_path = os.path.join(OUTPUT_FOLDER, f".SENTRIX_{timestamp}.recording.mp4")
 
-            fourcc = (
-                cv2.VideoWriter_fourcc(
-                    *"mp4v"
-                )
-            )
+            fourcc = cv2.VideoWriter_fourcc(*"mp4v")
 
             video_writer = (
                 cv2.VideoWriter(
-                    current_recording_path,
+                    current_recording_temp_path,
                     fourcc,
                     20.0,
                     (
@@ -1111,6 +941,7 @@ def run_sentrix():
                 video_writer = None
 
                 current_recording_path = None
+                current_recording_temp_path = None
 
         # ====================================================
         # WRITE VIDEO
@@ -1145,9 +976,16 @@ def run_sentrix():
                 - last_motion_time
             )
 
+            total_recording_elapsed = (
+                time.time() - recording_start_time
+            ) if recording_start_time is not None else 0
+
+            # Only stop recording when:
+            # 1. Total recording duration has reached at least 1 minute (60 seconds)
+            # 2. Motion has been clear for at least POST_MOTION_SECONDS (10s buffer)
             if (
-                elapsed_since_motion
-                >= POST_MOTION_SECONDS
+                total_recording_elapsed >= MIN_RECORDING_SECONDS
+                and elapsed_since_motion >= POST_MOTION_SECONDS
             ):
 
                 # --------------------------------------------
@@ -1181,20 +1019,20 @@ def run_sentrix():
 
                 recording = False
 
-                print(
-                    "Recording stopped."
-                )
+                video_is_valid = finalize_mp4(current_recording_temp_path, current_recording_path)
+                print("Recording stopped.")
+                if not video_is_valid:
+                    print("ERROR: Recording was not finalised as a playable MP4.")
 
                 # --------------------------------------------
-                # SAVE USEFUL RECORDING (minimum 5 seconds)
+                # SAVE USEFUL RECORDING (MINIMUM 1 MINUTE)
                 # --------------------------------------------
 
                 if (
-                    current_recording_path is not None
+                    video_is_valid
+                    and current_recording_path is not None
                     and recording_duration >= MIN_RECORDING_SECONDS
-                    and os.path.exists(
-                        current_recording_path
-                    )
+                    and os.path.exists(current_recording_path)
                 ):
 
                     try:
@@ -1250,6 +1088,7 @@ def run_sentrix():
                 recording_start_time = None
 
                 current_recording_path = None
+                current_recording_temp_path = None
 
         # ====================================================
         # CAMERA STATUS
@@ -1271,6 +1110,26 @@ def run_sentrix():
         # UPDATE DASHBOARD STATUS
         # ====================================================
 
+        # Update object monitor with newest frame
+        object_monitor.update_frame(frame)
+        obj_mon_status = object_monitor.get_status()
+
+        # Log ONE alert when object goes missing, and ONE notification when restored
+        if object_monitor.check_and_reset_alert_trigger():
+            asset_title = obj_mon_status.get("object_name") or "Monitored asset"
+            log_event(
+                f"ALERT: Monitored asset '{asset_title}' missing from camera view",
+                event_type="object_alert",
+                event_key=f"obj_missing_{int(time.time())}"
+            )
+        if object_monitor.check_and_reset_restored_trigger():
+            asset_title = obj_mon_status.get("object_name") or "Monitored asset"
+            log_event(
+                f"RESOLVED: Monitored asset '{asset_title}' restored to camera view",
+                event_type="object_alert",
+                event_key=f"obj_restored_{int(time.time())}"
+            )
+
         send_dashboard_status(
             camera=camera_status,
             motion=motion_detected,
@@ -1278,7 +1137,9 @@ def run_sentrix():
             people=detected_people,
             tamper=current_tamper_status,
             tampering=tamper_detected,
-            recording=recording
+            recording=recording,
+            siren=siren_manager.is_active(),
+            object_monitor_status=obj_mon_status
         )
 
         # ====================================================
@@ -1310,35 +1171,68 @@ def run_sentrix():
             )
 
         # ====================================================
-        # TAMPER STATUS
+        # TAMPER STATUS, SIREN & OBJECT MONITOR OVERLAY
         # ====================================================
 
+        tamper_color = (0, 0, 255) if tamper_detected else (255, 255, 0)
         cv2.putText(
             frame,
             f"Tamper: {current_tamper_status}",
             (20, 65),
             cv2.FONT_HERSHEY_SIMPLEX,
             0.55,
-            (255, 255, 0),
+            tamper_color,
             2
         )
+
+        y_pos = 95
+        if siren_manager.is_active():
+            cv2.putText(
+                frame,
+                "SIREN ACTIVE - TAMPER ALARM",
+                (20, y_pos),
+                cv2.FONT_HERSHEY_SIMPLEX,
+                0.65,
+                (0, 0, 255),
+                2
+            )
+            y_pos += 30
+
+        # Monitored Object Visual Indicator on Camera Feed (Text only, NO bounding box)
+        if obj_mon_status.get("has_object"):
+            if obj_mon_status.get("alert"):
+                obj_name_str = (obj_mon_status.get("object_name") or "OBJECT").upper()
+                cv2.putText(
+                    frame,
+                    f"ALERT: {obj_name_str} MISSING!",
+                    (20, y_pos),
+                    cv2.FONT_HERSHEY_SIMPLEX,
+                    0.7,
+                    (0, 0, 255),
+                    2
+                )
+            else:
+                cv2.putText(
+                    frame,
+                    f"Asset Protected: {obj_mon_status.get('object_name', 'Object')} (IN VIEW)",
+                    (20, y_pos),
+                    cv2.FONT_HERSHEY_SIMPLEX,
+                    0.55,
+                    (0, 255, 0),
+                    2
+                )
 
         # ====================================================
         # UPDATE DASHBOARD FRAME
         # ====================================================
 
         try:
-
-            update_frame(
-                frame
-            )
-
+            now_for_dashboard = time.time()
+            if now_for_dashboard - last_dashboard_frame_update >= DASHBOARD_FRAME_INTERVAL:
+                update_frame(frame)
+                last_dashboard_frame_update = now_for_dashboard
         except Exception as e:
-
-            print(
-                "Dashboard frame update error:",
-                e
-            )
+            print("Dashboard frame update error:", e)
 
         # ====================================================
         # DISPLAY CAMERA
@@ -1396,6 +1290,8 @@ def run_sentrix():
 
         video_writer = None
 
+        video_is_valid = finalize_mp4(current_recording_temp_path, current_recording_path)
+
         recording_duration = 0
 
         if recording_start_time is not None:
@@ -1406,15 +1302,14 @@ def run_sentrix():
             )
 
         # ----------------------------------------------------
-        # SAVE ACTIVE RECORDING IF USEFUL (minimum 5 seconds)
+        # SAVE ACTIVE RECORDING IF USEFUL
         # ----------------------------------------------------
 
         if (
-            current_recording_path is not None
-            and recording_duration >= MIN_RECORDING_SECONDS
-            and os.path.exists(
-                current_recording_path
-            )
+            video_is_valid
+            and current_recording_path is not None
+            and recording_duration >= 2.0
+            and os.path.exists(current_recording_path)
         ):
 
             try:
@@ -1461,16 +1356,26 @@ def run_sentrix():
         recording_start_time = None
 
         current_recording_path = None
+        current_recording_temp_path = None
 
         recording = False
 
     # --------------------------------------------------------
-    # RELEASE CAMERA
+    # STOP WORKER AND RELEASE CAMERA
     # --------------------------------------------------------
+
+    face_worker_stop.set()
+    try:
+        face_worker_thread.join(timeout=1.0)
+    except Exception:
+        pass
 
     camera.release()
 
     cv2.destroyAllWindows()
+
+    siren_manager.stop()
+    object_monitor.stop()
 
     # ========================================================
     # FINAL DASHBOARD STATUS
@@ -1483,7 +1388,8 @@ def run_sentrix():
         people=[],
         tamper="CAMERA OK",
         tampering=False,
-        recording=False
+        recording=False,
+        siren=False
     )
 
     print()
