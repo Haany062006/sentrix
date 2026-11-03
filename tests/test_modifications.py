@@ -346,6 +346,74 @@ class TestSentrixExaminerModifications(unittest.TestCase):
         self.assertIn("Office Projector", res["answer"])
         self.assertIn("09:10:00", res["answer"])
 
+    # --------------------------------------------------------
+    # 8. BLUR ROBUSTNESS & LENS-COVERED-ONLY SIREN TESTS
+    # --------------------------------------------------------
+    def test_blur_detector_robustness(self):
+        from app.tamper.blur import BlurDetector
+        detector = BlurDetector(threshold=6.0, confirm_frames=4, calibration_frames=10, ratio=0.20)
+        
+        # 1. Normal indoor scene (even low texture) should NOT trigger blur
+        plain_frame = np.ones((480, 640, 3), dtype=np.uint8) * 150
+        noise = np.random.normal(0, 2, (480, 640, 3)).astype(np.int16)
+        plain_frame = np.clip(plain_frame.astype(np.int16) + noise, 0, 255).astype(np.uint8)
+
+        for _ in range(15):
+            detector.detect(plain_frame)
+
+        blurry = False
+        for _ in range(10):
+            b, _ = detector.detect(plain_frame)
+            if b:
+                blurry = True
+        self.assertFalse(blurry, "Normal camera scene was falsely detected as camera blurred!")
+
+        # 2. Heavily blurred scene (tampering) MUST be detected
+        tamper_blurred = cv2.GaussianBlur(plain_frame, (31, 31), 10)
+        detected_blur = False
+        for _ in range(8):
+            b, _ = detector.detect(tamper_blurred)
+            if b:
+                detected_blur = True
+        self.assertTrue(detected_blur, "Tamper blur was not detected!")
+
+    def test_tamper_siren_lens_covered_only(self):
+        from app.tamper.detector import TamperDetector
+        from app.tamper.siren import SirenManager
+
+        siren = SirenManager(default_duration=2.0, sound_enabled=False)
+        ref_frame = np.zeros((480, 640, 3), dtype=np.uint8)
+        cv2.putText(ref_frame, 'TEST SCENE', (50, 150), cv2.FONT_HERSHEY_SIMPLEX, 2, (255, 255, 255), 4)
+        cv2.rectangle(ref_frame, (100, 200), (500, 400), (200, 200, 200), -1)
+        td = TamperDetector(ref_frame)
+
+        # Calibrate with normal frame
+        for _ in range(15):
+            res = td.detect(ref_frame)
+        self.assertEqual(res["status"], "CAMERA OK")
+        if res["status"] == "LENS COVERED":
+            siren.trigger(reason="TAMPER: LENS COVERED")
+        self.assertFalse(siren.is_active())
+
+        # Blur frame -> CAMERA BLURRED -> Siren MUST NOT trigger
+        blurred = cv2.GaussianBlur(ref_frame, (31, 31), 10)
+        for _ in range(10):
+            res_b = td.detect(blurred)
+        self.assertEqual(res_b["status"], "CAMERA BLURRED")
+        if res_b["status"] == "LENS COVERED":
+            siren.trigger(reason="TAMPER: LENS COVERED")
+        self.assertFalse(siren.is_active(), "Siren triggered on blur! Siren must be for lens covered only.")
+
+        # Dark frame -> LENS COVERED -> Siren triggers
+        dark = np.zeros((480, 640, 3), dtype=np.uint8)
+        for _ in range(3):
+            res_dark = td.detect(dark)
+        self.assertEqual(res_dark["status"], "LENS COVERED")
+        if res_dark["status"] == "LENS COVERED":
+            siren.trigger(reason="TAMPER: LENS COVERED")
+        self.assertTrue(siren.is_active(), "Siren did not trigger on lens covered!")
+        siren.stop()
+
 
 if __name__ == "__main__":
     unittest.main()

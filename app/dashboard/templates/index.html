@@ -991,7 +991,7 @@
                         <span id="sirenBadge" style="font-size:12px; color:#36d17c; font-weight:bold;">STANDBY</span>
                     </div>
                     <p style="color:#9ba7b3; font-size:13px; margin:6px 0 10px;">
-                        Instantly triggers an audible deterrent siren when camera tampering (lens covered, blur, or movement) is detected.
+                        Instantly triggers an audible deterrent siren when camera lens is covered.
                     </p>
                     <div style="display:flex; gap:10px;">
                         <button class="siren-test-btn" onclick="triggerSirenTest()">🔊 Test Siren</button>
@@ -1596,7 +1596,7 @@
                 : String(eventText);
             const lower = message.toLowerCase();
 
-            if (lower.includes("monitored object not detected") || lower.includes("object_alert")) {
+            if (lower.includes("monitored object not detected") || lower.includes("object_alert") || lower.includes("missing")) {
                 return {
                     type: "object_alert",
                     title: "⚠️ OBJECT MONITORING ALERT",
@@ -1627,29 +1627,28 @@
 
             if (lower.includes("lens covered")) {
                 return {
-                    type: "tamper",
-                    title: "🔴 SECURITY ALERT",
-                    message: "Lens covered",
-                    voice: "Warning. Camera lens covered."
+                    type: "tamper_lens",
+                    title: "🚨 LENS COVERED - SIREN ACTIVE",
+                    message: "Camera lens covered! Deterrent siren activated.",
+                    voice: "Warning! Camera lens covered! Siren activated!"
                 };
             }
 
-            if (lower.includes("camera blurred") ||
-                lower.includes("lens blurred")) {
+            if (lower.includes("camera blurred") || lower.includes("lens blurred")) {
                 return {
-                    type: "tamper",
-                    title: "🔴 SECURITY ALERT",
-                    message: "Camera lens blurred",
+                    type: "tamper_blur",
+                    title: "⚠️ CAMERA BLUR DETECTED",
+                    message: "Camera image is blurred.",
                     voice: "Warning. Camera lens is blurred."
                 };
             }
 
-            if (lower.includes("camera moved") || lower.includes("lens covered") || lower.includes("camera blurred") || lower.includes("tamper")) {
+            if (lower.includes("camera moved")) {
                 return {
-                    type: "tamper",
-                    title: "🚨 TAMPER ALARM TRIGGERED",
-                    message: "Camera tampering detected! Deterrent siren activated.",
-                    voice: "Warning! Camera tampering detected! Siren activated!"
+                    type: "tamper_moved",
+                    title: "⚠️ CAMERA MOVEMENT DETECTED",
+                    message: "Camera orientation changed.",
+                    voice: "Warning. Camera moved."
                 };
             }
 
@@ -1715,50 +1714,45 @@
         }
 
 
+        let seenEvents = new Set();
+
         function updateCriticalAlerts(events) {
 
             if (!events || events.length === 0) {
                 return;
             }
 
-            const latestEvent =
-                String(events[0]);
-
-            /*
-             * Establish the current event on first load.
-             * This prevents an old alert from popping up just
-             * because the dashboard was refreshed.
-             */
-
             if (!eventsInitialized) {
-
-                lastCriticalEvent =
-                    latestEvent;
-
-                eventsInitialized =
-                    true;
-
-                return;
-
-            }
-
-            if (latestEvent === lastCriticalEvent) {
+                for (let i = 0; i < events.length; i++) {
+                    seenEvents.add(String(events[i]));
+                }
+                eventsInitialized = true;
                 return;
             }
 
-            lastCriticalEvent =
-                latestEvent;
-
-            const alert =
-                getCriticalAlert(latestEvent);
-            if (!canAlert(alert.type + ":" + alert.message)) {
-                return;
+            // Collect all new events that have not yet been evaluated
+            const newEvents = [];
+            for (let i = 0; i < Math.min(events.length, 10); i++) {
+                const evStr = String(events[i]);
+                if (!seenEvents.has(evStr)) {
+                    newEvents.unshift(evStr);
+                    seenEvents.add(evStr);
+                }
             }
-            if (alert) {
-                showSecurityPopup(
-                    alert,
-                    latestEvent
-                );
+
+            if (seenEvents.size > 200) {
+                seenEvents = new Set(Array.from(seenEvents).slice(-100));
+            }
+
+            for (const ev of newEvents) {
+                const alert = getCriticalAlert(ev);
+                if (alert && canAlert(alert.type + ":" + alert.message)) {
+                    showSecurityPopup(
+                        alert,
+                        ev
+                    );
+                    break;
+                }
             }
 
         }
@@ -2368,12 +2362,12 @@
 
         setInterval(
             updateStatus,
-            1000
+            300
         );
 
         setInterval(
             updateEvents,
-            1000
+            300
         );
 
         setInterval(

@@ -22,7 +22,7 @@ def detect_darkness(frame):
 class TamperDetector:
     def __init__(self, reference_frame):
         self.scene_change_detector = SceneChangeDetector(reference_frame)
-        self.blur_detector = BlurDetector(threshold=28.0, confirm_frames=2, calibration_frames=12, ratio=0.45)
+        self.blur_detector = BlurDetector(threshold=6.0, confirm_frames=3, calibration_frames=12, ratio=0.20)
         self.dark_frames = 0
         self.last_status = "CAMERA OK"
 
@@ -46,23 +46,25 @@ class TamperDetector:
             self.blur_detector.reset()
             return self._result("LENS COVERED", brightness, 0.0, 0.0)
 
-        # Preserve the existing, previously working camera-movement detector.
-                # Detect camera movement using the scene detector.
-        try:
-            moved, correlation = self.scene_change_detector.detect(frame)
-        except Exception as exc:
-            print("Scene-change detection error:", exc)
-            moved, correlation = False, 1.0
+        blurry, variance = self.blur_detector.detect(frame, brightness=brightness)
+        if blurry:
+            return self._result("CAMERA BLURRED", brightness, variance, 1.0)
+
+        # Only evaluate camera movement if the image is clear (not blurry)
+        moved, correlation = False, 1.0
+        if self.blur_detector._blur_count == 0:
+            try:
+                moved, correlation = self.scene_change_detector.detect(frame)
+            except Exception as exc:
+                print("Scene-change detection error:", exc)
+                moved, correlation = False, 1.0
 
         if moved:
-            self.blur_detector.reset()
             return self._result(
                 "CAMERA MOVED",
                 brightness,
-                0.0,
+                variance,
                 correlation
             )
-        blurry, variance = self.blur_detector.detect(frame)
-        if blurry:
-            return self._result("CAMERA BLURRED", brightness, variance, correlation)
+
         return self._result("CAMERA OK", brightness, variance, correlation)

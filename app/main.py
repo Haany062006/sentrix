@@ -80,10 +80,12 @@ def log_event(
     # Use specified cooldown if provided, else use defaults
     if cooldown is not None:
         event_cooldown = float(cooldown)
-    elif event_key.startswith("recognized_") or event_key == "unknown_person":
-        event_cooldown = 60
+    elif event_key.startswith("recognized_"):
+        event_cooldown = 10
+    elif event_key == "unknown_person":
+        event_cooldown = 8
     elif event_key.startswith("tamper_"):
-        event_cooldown = 60
+        event_cooldown = 3
     elif event_key == "obj_missing_alert":
         event_cooldown = 15
     else:
@@ -549,7 +551,7 @@ def run_sentrix():
 
     # Run expensive tamper analysis at most five times per second.
     # Reuse the latest result between checks to reduce processing overhead.
-    TAMPER_CHECK_INTERVAL = 0.20
+    TAMPER_CHECK_INTERVAL = 0.08
     last_tamper_check_time = 0.0
     cached_tamper_result = {
         "tampering": False,
@@ -823,25 +825,27 @@ def run_sentrix():
             "histogram_correlation"
         )
 
-        # Trigger siren on camera tampering (lens covered, blur, camera moved)
-        if tamper_detected:
+        # Trigger siren ONLY for lens covered tampering (not for blur, moved, or unknown person)
+        if current_tamper_status == "LENS COVERED":
             try:
                 siren_manager.trigger(
-                    reason=f"TAMPER: {current_tamper_status}",
+                    reason="TAMPER: LENS COVERED",
                     duration=10.0
                 )
             except Exception as siren_err:
                 print("Siren trigger error:", siren_err)
         else:
-            if current_tamper_status == "CAMERA OK" and siren_manager.is_active():
+            if siren_manager.is_active():
                 siren_manager.stop()
 
         # Log only when the reported tamper status changes.
         if current_tamper_status != last_logged_tamper_status:
             if tamper_detected:
+                siren_tag = " (Siren Triggered)" if current_tamper_status == "LENS COVERED" else ""
                 log_event(
-                    f"Tamper detected: {current_tamper_status} (Siren Triggered)",
-                    event_key=f"tamper_{current_tamper_status}",
+                    f"Tamper detected: {current_tamper_status}{siren_tag}",
+                    event_key=f"tamper_{current_tamper_status}_{int(time.time())}",
+                    cooldown=2.0,
                     tamper_type=current_tamper_status,
                     brightness=tamper_brightness,
                     blur_variance=tamper_blur_variance,
@@ -850,7 +854,8 @@ def run_sentrix():
             elif last_logged_tamper_status != "CAMERA OK":
                 log_event(
                     "Camera tampering cleared",
-                    event_key="tamper_cleared"
+                    event_key=f"tamper_cleared_{int(time.time())}",
+                    cooldown=2.0
                 )
 
             last_logged_tamper_status = current_tamper_status
@@ -1189,7 +1194,7 @@ def run_sentrix():
         if siren_manager.is_active():
             cv2.putText(
                 frame,
-                "SIREN ACTIVE - TAMPER ALARM",
+                "SIREN ACTIVE - LENS COVERED",
                 (20, y_pos),
                 cv2.FONT_HERSHEY_SIMPLEX,
                 0.65,
