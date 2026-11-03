@@ -48,6 +48,8 @@ class ObjectMonitor:
         self.active_interval_id = None
         self.alert_newly_triggered = False
         self.restored_newly_triggered = False
+        self.GRACE_PERIOD_SECONDS = 0.8
+        self.MIN_MISSES_FOR_ALERT = 3
 
         # SIFT detector (scale & rotation invariant)
         try:
@@ -250,14 +252,14 @@ class ObjectMonitor:
                     for pair in raw_matches:
                         if len(pair) == 2:
                             m, n = pair
-                            if m.distance < 0.78 * n.distance:
+                            if m.distance < 0.72 * n.distance:
                                 good_sift.append(m)
                     good_sift_matches = len(good_sift)
 
                     if good_sift_matches >= 4:
                         src_pts = np.float32([self.template_sift_kp[m.queryIdx].pt for m in good_sift]).reshape(-1, 1, 2)
                         dst_pts = np.float32([kp_frame[m.trainIdx].pt for m in good_sift]).reshape(-1, 1, 2)
-                        _, mask = cv2.findHomography(src_pts, dst_pts, cv2.RANSAC, 5.0)
+                        _, mask = cv2.findHomography(src_pts, dst_pts, cv2.RANSAC, 4.0)
                         if mask is not None:
                             sift_inliers = int(np.sum(mask))
             except Exception:
@@ -292,14 +294,15 @@ class ObjectMonitor:
             except Exception:
                 pass
 
-        # DETECTION DECISION
-        if (
-            sift_inliers >= 4
-            or good_sift_matches >= 4
-            or best_tm_score >= 0.58
-            or good_orb_matches >= 9
-        ):
-            matched = True
+        # DETECTION DECISION - Robust multi-modal verification
+        # Avoids false positives on background walls; requires genuine feature support
+        matched = bool(
+            sift_inliers >= 5
+            or (good_sift_matches >= 8 and sift_inliers >= 4)
+            or (best_tm_score >= 0.76 and (sift_inliers >= 2 or good_sift_matches >= 3 or good_orb_matches >= 4))
+            or (best_tm_score >= 0.82)
+            or (good_orb_matches >= 12 and best_tm_score >= 0.62)
+        )
 
         now = time.time()
         with self.lock:

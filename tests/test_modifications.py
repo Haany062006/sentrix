@@ -241,28 +241,47 @@ class TestSentrixExaminerModifications(unittest.TestCase):
 
     def test_object_monitor_api_endpoints(self):
         from app.dashboard.dashboard import app
+        from app.object_monitor import object_monitor
         client = app.test_client()
 
-        # Check status
-        resp = client.get("/api/object-monitor/status")
-        self.assertEqual(resp.status_code, 200)
+        existing_path = "data/monitored_object.png"
+        backup_bytes = None
+        backup_name = None
+        if os.path.exists(existing_path):
+            try:
+                with open(existing_path, "rb") as f:
+                    backup_bytes = f.read()
+                backup_name = getattr(object_monitor, "object_name", "Monitored Object")
+            except Exception:
+                pass
 
-        # Upload image
-        test_img = np.ones((80, 80, 3), dtype=np.uint8) * 150
-        _, png_bytes = cv2.imencode(".png", test_img)
-        upload_data = {"file": (io.BytesIO(png_bytes.tobytes()), "office_keys.png")}
-        up_resp = client.post("/api/object-monitor/upload", data=upload_data, content_type="multipart/form-data")
-        self.assertEqual(up_resp.status_code, 200)
-        self.assertTrue(up_resp.get_json()["success"])
+        try:
+            # Check status
+            resp = client.get("/api/object-monitor/status")
+            self.assertEqual(resp.status_code, 200)
 
-        # Fetch image
-        img_resp = client.get("/api/object-monitor/image")
-        self.assertEqual(img_resp.status_code, 200)
+            # Upload image
+            test_img = np.ones((80, 80, 3), dtype=np.uint8) * 150
+            _, png_bytes = cv2.imencode(".png", test_img)
+            upload_data = {"file": (io.BytesIO(png_bytes.tobytes()), "office_keys.png")}
+            up_resp = client.post("/api/object-monitor/upload", data=upload_data, content_type="multipart/form-data")
+            self.assertEqual(up_resp.status_code, 200)
+            self.assertTrue(up_resp.get_json()["success"])
 
-        # Clear
-        clear_resp = client.post("/api/object-monitor/clear")
-        self.assertEqual(clear_resp.status_code, 200)
-        self.assertFalse(clear_resp.get_json()["status"]["has_object"])
+            # Fetch image
+            img_resp = client.get("/api/object-monitor/image")
+            self.assertEqual(img_resp.status_code, 200)
+
+            # Clear
+            clear_resp = client.post("/api/object-monitor/clear")
+            self.assertEqual(clear_resp.status_code, 200)
+            self.assertFalse(clear_resp.get_json()["status"]["has_object"])
+        finally:
+            if backup_bytes is not None:
+                np_arr = np.frombuffer(backup_bytes, np.uint8)
+                img = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
+                if img is not None:
+                    object_monitor.set_object_image(img, name=backup_name)
 
     # --------------------------------------------------------
     # 7. MISSING TIME INTERVAL TRACKING & SINGLE-ALERT TRIGGER
